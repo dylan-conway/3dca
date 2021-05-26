@@ -1,0 +1,121 @@
+
+#include "shaders.h"
+
+GLuint _program_id, _vshader_id, _fshader_id;
+GLuint _mvp_uniform_location, _camera_uniform_location;
+GLuint _light_direction_uniform_location, _lighting_coefficients_uniform_location;
+
+void _print_shader_info_log(GLuint shader_index) {
+    int max_length = 2048;
+    int actual_length = 0;
+    char shader_log[2048];
+    glGetShaderInfoLog(shader_index, max_length, &actual_length, shader_log);
+    printf("shader info log for GL index %u:\n%s\n", shader_index, shader_log);
+}
+
+const char *GetVertexShader()
+{
+   static char vertex_shader[1024];
+   strcpy(vertex_shader, 
+           "#version 400\n"
+           "layout (location = 0) in vec3 vertex_position;\n"
+           "layout (location = 1) in vec3 vertex_normal;\n"
+           "uniform mat4 mvp;\n"
+           "uniform vec3 camera_pos;\n"
+           "uniform vec3 light_direction;\n"
+           "uniform vec4 lighting_coefficients;\n"
+           "out float shading;\n"
+           "void main() {\n"
+           "  gl_Position = mvp * vec4(vertex_position, 1.0);\n"
+           "  shading = lighting_coefficients[0];\n"
+           "  float ldotn = dot(light_direction, vertex_normal);\n"
+           "  shading += ldotn < 0 ? 0 : ldotn * lighting_coefficients[1];\n"
+           "}\n"
+         );
+   return vertex_shader;
+}
+
+const char *GetFragmentShader()
+{
+   static char fragment_shader[1024];
+   strcpy(fragment_shader, 
+           "#version 400\n"
+           "in float shading;\n"
+           "out vec4 frag_color;\n"
+           "void main() {\n"
+           "  frag_color = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
+           "  for(int i = 0; i < 3; i ++){\n"
+           "    frag_color[i] = frag_color[i] * shading > 1 ? 1 : frag_color[i] * shading;\n"
+           "  }\n"
+           "}\n"
+         );
+   return fragment_shader;
+}
+
+int CreateShaders(){
+
+    const char* vertex_shader = GetVertexShader();
+    const char* fragment_shader = GetFragmentShader();
+
+    _vshader_id = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(_vshader_id, 1, &vertex_shader, NULL);
+    glCompileShader(_vshader_id);
+    int params = -1;
+    glGetShaderiv(_vshader_id, GL_COMPILE_STATUS, &params);
+    if(GL_TRUE != params){
+        printf("ERROR: GL shader index %d did not compile\n", _vshader_id);
+        _print_shader_info_log(_vshader_id);
+        return -1;
+    }
+
+    _fshader_id = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(_fshader_id, 1, &fragment_shader, NULL);
+    glCompileShader(_fshader_id);
+    glGetShaderiv(_fshader_id, GL_COMPILE_STATUS, &params);
+    if(GL_TRUE != params){
+        printf("ERROR: GL shader index %d did not compile\n", _fshader_id);
+        _print_shader_info_log(_fshader_id);
+        return -1;
+    }
+
+    _program_id = glCreateProgram();
+    glAttachShader(_program_id, _fshader_id);
+    glAttachShader(_program_id, _vshader_id);
+    glLinkProgram(_program_id);
+    glUseProgram(_program_id);
+
+    _mvp_uniform_location = glGetUniformLocation(_program_id, "mvp");
+    _camera_uniform_location = glGetUniformLocation(_program_id, "camera_pos");
+    _light_direction_uniform_location = glGetUniformLocation(_program_id, "light_direction");
+    _lighting_coefficients_uniform_location = glGetUniformLocation(_program_id, "lighting_coefficients");
+
+    vec4 lighting_coefficients;
+    lighting_coefficients[0] = 0.3f;
+    lighting_coefficients[1] = 0.7f;
+    lighting_coefficients[2] = 2.8f;
+    lighting_coefficients[3] = 50.5f;
+    
+    glUniform4fv(_lighting_coefficients_uniform_location, 1, lighting_coefficients);
+
+    return 0;
+}
+
+void DeleteShaders(){
+    glDetachShader(_program_id, _vshader_id);
+    glDeleteShader(_vshader_id);
+    glDetachShader(_program_id, _fshader_id);
+    glDeleteShader(_fshader_id);
+    glDeleteProgram(_program_id);
+}
+
+void UpdateMVPUniform(mat4 mvp){
+    glUniformMatrix4fv(_mvp_uniform_location, 1, GL_FALSE, &mvp[0][0]);
+}
+
+void UpdateCameraUniform(vec3 camera_position){
+    glUniform3fv(_camera_uniform_location, 1, &camera_position[0]);
+}
+
+void UpdateLightDirectionUniform(vec3 light_direction){
+    glUniform3fv(_light_direction_uniform_location, 1, &light_direction[0]);
+}

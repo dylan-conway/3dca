@@ -3,57 +3,142 @@
 #include <SDL2/SDL.h>
 #include <cglm/cglm.h>
 
-#define WINDOW_W 1920 / 4 * 3
-#define WINDOW_H 1080 / 4 * 3
+#include "shaders.h"
+#include "meshes.h"
+#include "camera.h"
+#include "defines.h"
 
 SDL_GLContext ctx = NULL;
 SDL_Window* window = NULL;
-GLuint shader_program;
+struct Camera cam;
+
+SDL_bool wireframe = SDL_FALSE;
 
 int INIT();
-const char* GetVertexShader();
-const char* GetFragmentShader();
-
-void _print_shader_info_log(GLuint shader_index) {
-    int max_length = 2048;
-    int actual_length = 0;
-    char shader_log[2048];
-    glGetShaderInfoLog(shader_index, max_length, &actual_length, shader_log);
-    printf("shader info log for GL index %u:\n%s\n", shader_index, shader_log);
-}
 
 int main(int argc, char** argv){
 
-    
-
+    // Init SDL2, OpenGL, GLEW, and create shaders
     if(INIT() == -1){
         return -1;
     }
 
+    cam = InitCamera();
+
+    struct Cube test_cube = InitCube();
+
     SDL_bool running = SDL_TRUE;
     SDL_Event event;
 
+    SDL_bool right_key = SDL_FALSE;
+    SDL_bool left_key = SDL_FALSE;
+    SDL_bool up_key = SDL_FALSE;
+    SDL_bool down_key = SDL_FALSE;
+
+    Uint64 curr_frame_time, prev_frame_time;
+    prev_frame_time = SDL_GetPerformanceCounter();
     while(running){
+        curr_frame_time = SDL_GetPerformanceCounter();
+        double delta = (double)(curr_frame_time - prev_frame_time) / (double)SDL_GetPerformanceFrequency();
+
         while(SDL_PollEvent(&event)){
             switch(event.type){
                 case SDL_QUIT:
                     running = SDL_FALSE;
                     break;
                 case SDL_KEYDOWN:
-                    if(event.key.keysym.sym == SDLK_ESCAPE){
-                        running = SDL_FALSE;
+                    switch(event.key.keysym.sym){
+                        case SDLK_ESCAPE:
+                            running = SDL_FALSE;
+                            break;
+                        case SDLK_RIGHT:
+                            right_key = SDL_TRUE;
+                            break;
+                        case SDLK_LEFT:
+                            left_key = SDL_TRUE;
+                            break;
+                        case SDLK_UP:
+                            up_key = SDL_TRUE;
+                            break;
+                        case SDLK_DOWN:
+                            down_key = SDL_TRUE;
+                            break;
+                        case SDLK_SPACE:
+                            if(wireframe){
+                                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                                wireframe = SDL_FALSE;
+                            } else {
+                                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                                wireframe = SDL_TRUE;
+                            }
+                            break;
+                    }
+                    break;
+                case SDL_KEYUP:
+                    switch(event.key.keysym.sym){
+                        case SDLK_RIGHT:
+                            right_key = SDL_FALSE;
+                            break;
+                        case SDLK_LEFT:
+                            left_key = SDL_FALSE;
+                            break;
+                        case SDLK_UP:
+                            up_key = SDL_FALSE;
+                            break;
+                        case SDLK_DOWN:
+                            down_key = SDL_FALSE;
+                            break;
                     }
                     break;
             }
         }
 
-        glClearColor(1, 0, 1, 1);
+        if(right_key){
+            
+            cam.position[0] += 10.0f * delta;
+        }
+
+        if(left_key){
+            cam.position[0] += -10.0f * delta;
+        }
+
+        if(up_key){
+            cam.position[1] += 10.0f * delta;
+        }
+
+        if(down_key){
+            cam.position[1] += -10.0f * delta;
+        }
+        
+        mat4 mvp;
+        mat4 model = GLM_MAT4_IDENTITY_INIT;
+        GetMVP(&cam, &model, mvp);
+
+        // Update shader uniforms
+        UpdateMVPUniform(mvp);
+        UpdateCameraUniform(cam.position);
+
+        vec3 light_direction;
+        glm_vec3_sub((vec3){0.0f, 0.0f, 0.0f}, cam.position, light_direction);
+        glm_vec3_normalize(light_direction);
+        UpdateLightDirectionUniform(light_direction);
+
+        // Clear window
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
+
+        // Draw elements
+        DrawCube(&test_cube);
+
+        // Swap buffers
         SDL_GL_SwapWindow(window);
+
+        prev_frame_time = curr_frame_time;
     }
 
+    DeleteShaders();
     SDL_GL_DeleteContext(ctx);
     SDL_DestroyWindow(window);
     SDL_Quit();    
@@ -95,7 +180,8 @@ int INIT(){
         printf("SDL GL CREATE CONTEXT FAILED\n");
         return -1;
     }
-    glViewport(0, 0, (GLsizei)10, (GLsizei)10);
+    SDL_GL_SetSwapInterval(0);
+    glViewport(0, 0, WINDOW_W, WINDOW_H);
 
     // Initialize glew
     glewExperimental = GL_TRUE;
@@ -116,83 +202,11 @@ int INIT(){
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-
-    const char* vertex_shader = GetVertexShader();
-    const char* fragment_shader = GetFragmentShader();
-
-    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vs, 1, &vertex_shader, NULL);
-    glCompileShader(vs);
-    int params = -1;
-    glGetShaderiv(vs, GL_COMPILE_STATUS, &params);
-    if(GL_TRUE != params){
-        printf("ERROR: GL shader index %d did not compile\n", vs);
-        _print_shader_info_log(vs);
+    // Create a shader program for opengl and compile, attach, link shaders
+    if(CreateShaders() == -1){
+        printf("ERROR: CreateShaders failed\n");
         return -1;
     }
-
-    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fs, 1, &fragment_shader, NULL);
-    glCompileShader(fs);
-    glGetShaderiv(fs, GL_COMPILE_STATUS, &params);
-    if(GL_TRUE != params){
-        printf("ERROR: GL shader index %d did not compile\n", fs);
-        _print_shader_info_log(fs);
-        return -1;
-    }
-
-    shader_program = glCreateProgram();
-    glAttachShader(shader_program, fs);
-    glAttachShader(shader_program, vs);
-    glLinkProgram(shader_program);
-    glUseProgram(shader_program);
-
+    
     return 0;
-}
-
-const char *GetVertexShader()
-{
-   static char vertexShader[1024];
-   strcpy(vertexShader, 
-           "#version 400\n"
-           "layout (location = 0) in vec3 vertex_position;\n"
-           "layout (location = 1) in vec3 vertex_normal;\n"
-           "uniform vec3 cameraloc;  // Camera position \n"
-           "uniform vec3 lightdir;   // Lighting direction \n"
-           "uniform vec4 lightcoeff; // Lighting coeff, Ka, Kd, Ks, alpha\n"
-           "uniform mat4 MVP;\n"
-           "out float shading_amount;\n"
-           "void main() {\n"
-           "  gl_Position = MVP*vec4(vertex_position, 1.0);\n"
-           "  shading_amount = lightcoeff[0];\n"
-
-           "  float LdotN = dot(lightdir, vertex_normal);\n"
-           "  shading_amount += LdotN < 0 ? 0 : LdotN * lightcoeff[1];\n"
-
-           "  vec3 R = normalize(2 * LdotN * vertex_normal - lightdir);\n"
-           "  vec3 V = normalize(cameraloc - vertex_position);\n"
-           "  float RdotV = dot(R, V);\n"
-           "  float specular = RdotV > 0 ? pow(RdotV, lightcoeff[3]) * lightcoeff[2] : 0.0;\n"
-           "  shading_amount += specular;\n"
-           "}\n"
-         );
-   return vertexShader;
-}
-
-const char *GetFragmentShader()
-{
-   static char fragmentShader[1024];
-   strcpy(fragmentShader, 
-           "#version 400\n"
-           "in float shading_amount;\n"
-           "uniform vec3 color;\n"
-           "out vec4 frag_color;\n"
-           "void main() {\n"
-           "  frag_color = vec4(color, 1.0);\n"
-           "  for(int i = 0; i < 3; i ++){\n"
-           "    frag_color[i] = frag_color[i] * shading_amount > 1 ? 1 : frag_color[i] * shading_amount;\n"
-           "  }\n"
-           "}\n"
-         );
-   return fragmentShader;
 }
