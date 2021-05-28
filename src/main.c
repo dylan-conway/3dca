@@ -6,6 +6,7 @@
 #include <cglm/vec3.h>
 #include <cglm/vec2.h>
 #include <cglm/affine.h>
+#include <cglm/version.h>
 
 #include "shaders.h"
 #include "meshes.h"
@@ -181,6 +182,7 @@ int INIT(){
     SDL_version version;
     SDL_VERSION(&version);
     printf("SDL %d.%d.%d\n", version.major, version.minor, version.patch);
+    printf("CGLM %d.%d.%d\n", CGLM_VERSION_MAJOR, CGLM_VERSION_MINOR, CGLM_VERSION_PATCH);
     printf("GLEW %s\n", glewGetString(GLEW_VERSION));
     printf("RENDERER: %s\n", glGetString(GL_RENDERER));
     printf("OPENGL %s\n", glGetString(GL_VERSION));
