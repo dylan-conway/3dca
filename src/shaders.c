@@ -1,9 +1,9 @@
 
 #include "shaders.h"
 
-GLuint _program_id, _vshader_id, _fshader_id;
-GLuint _mvp_uniform_location, _camera_uniform_location;
-GLuint _light_direction_uniform_location, _lighting_coefficients_uniform_location;
+static GLuint _program_id, _vshader_id, _fshader_id;
+static GLuint _mvp_uniform_location, _camera_uniform_location;
+static GLuint _light_direction_uniform_location, _lighting_coefficients_uniform_location;
 
 void _print_shader_info_log(GLuint shader_index) {
     int max_length = 2048;
@@ -30,6 +30,12 @@ const char *GetVertexShader()
            "  shading = lighting_coefficients[0];\n"
            "  float ldotn = dot(light_direction, vertex_normal);\n"
            "  shading += ldotn < 0 ? 0 : ldotn * lighting_coefficients[1];\n"
+
+        //    "  vec3 r = normalize(2 * ldotn * vertex_normal - light_direction);\n"
+        //    "  vec3 v = normalize(camera_pos - vertex_position);\n"
+        //    "  float rdotv = dot(r, v);\n"
+        //    "  float specular = rdotv > 0 ? pow(rdotv, lighting_coefficients[3]) * lighting_coefficients[2] : 0.0;\n"
+        //    "  shading += specular;\n"
            "}\n"
          );
    return vertex_shader;
@@ -43,7 +49,7 @@ const char *GetFragmentShader()
            "in float shading;\n"
            "out vec4 frag_color;\n"
            "void main() {\n"
-           "  frag_color = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
+           "  frag_color = vec4(1.0f, 1.0f, 1.0f, 1.0f);\n"
            "  for(int i = 0; i < 3; i ++){\n"
            "    frag_color[i] = frag_color[i] * shading > 1 ? 1 : frag_color[i] * shading;\n"
            "  }\n"
@@ -57,10 +63,11 @@ int CreateShaders(){
     const char* vertex_shader = GetVertexShader();
     const char* fragment_shader = GetFragmentShader();
 
+    int params = -1;
+
     _vshader_id = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(_vshader_id, 1, &vertex_shader, NULL);
     glCompileShader(_vshader_id);
-    int params = -1;
     glGetShaderiv(_vshader_id, GL_COMPILE_STATUS, &params);
     if(GL_TRUE != params){
         printf("ERROR: GL shader index %d did not compile\n", _vshader_id);
@@ -109,13 +116,13 @@ void DeleteShaders(){
 }
 
 void UpdateMVPUniform(mat4 mvp){
-    glUniformMatrix4fv(_mvp_uniform_location, 1, GL_FALSE, &mvp[0][0]);
+    glUniformMatrix4fv(_mvp_uniform_location, 1, GL_FALSE, mvp[0]);
 }
 
 void UpdateCameraUniform(vec3 camera_position){
-    glUniform3fv(_camera_uniform_location, 1, &camera_position[0]);
+    glUniform3fv(_camera_uniform_location, 1, camera_position);
 }
 
 void UpdateLightDirectionUniform(vec3 light_direction){
-    glUniform3fv(_light_direction_uniform_location, 1, &light_direction[0]);
+    glUniform3fv(_light_direction_uniform_location, 1, light_direction);
 }

@@ -1,12 +1,18 @@
 #include <stdio.h>
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
-#include <cglm/cglm.h>
+#include <SDL2/SDL_opengl.h>
+#include <cglm/mat4.h>
+#include <cglm/vec3.h>
+#include <cglm/vec2.h>
+#include <cglm/affine.h>
 
 #include "shaders.h"
 #include "meshes.h"
 #include "camera.h"
 #include "defines.h"
+#include "input.h"
+
 
 SDL_GLContext ctx = NULL;
 SDL_Window* window = NULL;
@@ -23,17 +29,16 @@ int main(int argc, char** argv){
         return -1;
     }
 
+    InitInput();
+    InitCubeVAO();
+
     cam = InitCamera();
 
-    struct Cube test_cube = InitCube();
+    struct Cube test_cube = InitCube((vec3){0.0f, 0.0f, 0.0f});
+    struct Cube cube2 = InitCube((vec3){1.0f, 0.0f, 0.0f});
 
     SDL_bool running = SDL_TRUE;
     SDL_Event event;
-
-    SDL_bool right_key = SDL_FALSE;
-    SDL_bool left_key = SDL_FALSE;
-    SDL_bool up_key = SDL_FALSE;
-    SDL_bool down_key = SDL_FALSE;
 
     Uint64 curr_frame_time, prev_frame_time;
     prev_frame_time = SDL_GetPerformanceCounter();
@@ -41,81 +46,75 @@ int main(int argc, char** argv){
         curr_frame_time = SDL_GetPerformanceCounter();
         double delta = (double)(curr_frame_time - prev_frame_time) / (double)SDL_GetPerformanceFrequency();
 
+        UpdateInput();
+
         while(SDL_PollEvent(&event)){
             switch(event.type){
                 case SDL_QUIT:
                     running = SDL_FALSE;
+                    continue;
                     break;
                 case SDL_KEYDOWN:
-                    switch(event.key.keysym.sym){
-                        case SDLK_ESCAPE:
-                            running = SDL_FALSE;
-                            break;
-                        case SDLK_RIGHT:
-                            right_key = SDL_TRUE;
-                            break;
-                        case SDLK_LEFT:
-                            left_key = SDL_TRUE;
-                            break;
-                        case SDLK_UP:
-                            up_key = SDL_TRUE;
-                            break;
-                        case SDLK_DOWN:
-                            down_key = SDL_TRUE;
-                            break;
-                        case SDLK_SPACE:
-                            if(wireframe){
-                                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                                wireframe = SDL_FALSE;
-                            } else {
-                                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                                wireframe = SDL_TRUE;
-                            }
-                            break;
-                    }
+                    KeyboardHandleKeyDown(event.key.keysym.sym);
                     break;
                 case SDL_KEYUP:
-                    switch(event.key.keysym.sym){
-                        case SDLK_RIGHT:
-                            right_key = SDL_FALSE;
-                            break;
-                        case SDLK_LEFT:
-                            left_key = SDL_FALSE;
-                            break;
-                        case SDLK_UP:
-                            up_key = SDL_FALSE;
-                            break;
-                        case SDLK_DOWN:
-                            down_key = SDL_FALSE;
-                            break;
-                    }
+                    KeyboardHandleKeyUp(event.key.keysym.sym);
+                    break;
+                case SDL_MOUSEBUTTONDOWN:
+                    MouseHandleButtonDown(event.button.button);
+                    break;
+                case SDL_MOUSEBUTTONUP:
+                    MouseHandleButtonUp(event.button.button);
+                    break;
+                case SDL_MOUSEWHEEL:
+                    MouseHandleWheel(event.wheel);
                     break;
             }
         }
 
-        if(right_key){
-            
-            cam.position[0] += 10.0f * delta;
+        if(KeyClicked(SDLK_ESCAPE)){
+            running = SDL_FALSE;
+            continue;
         }
 
-        if(left_key){
-            cam.position[0] += -10.0f * delta;
+        if(KeyClicked(SDLK_SPACE)){
+            if(wireframe){
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                wireframe = SDL_FALSE;
+            } else {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                wireframe = SDL_TRUE;
+            }
         }
 
-        if(up_key){
-            cam.position[1] += 10.0f * delta;
+        if(ButtonClicked(SDL_BUTTON_LEFT)){
+            printf("LEFT BUTTON CLICKED\n");
         }
 
-        if(down_key){
-            cam.position[1] += -10.0f * delta;
+        if(ButtonReleased(SDL_BUTTON_LEFT)){
+            printf("LEFT BUTTON RELEASED\n");
         }
-        
-        mat4 mvp;
-        mat4 model = GLM_MAT4_IDENTITY_INIT;
-        GetMVP(&cam, &model, mvp);
 
-        // Update shader uniforms
-        UpdateMVPUniform(mvp);
+        if(KeyDown(SDLK_d)){
+            cube2.position[0] += 10.0f * delta;
+        }
+
+        if(KeyDown(SDLK_a)){
+            cube2.position[0] += -10.0f * delta;
+        }
+
+        if(KeyDown(SDLK_w)){
+            cube2.position[2] += -10.0f * delta;
+        }
+
+        if(KeyDown(SDLK_s)){
+            cube2.position[2] += 10.0f * delta;
+        }
+
+        if(KeyClicked(SDLK_z)){
+            SetScaleCube(&cube2, (vec3){3.0f, 1.0f, 1.0f});
+        }
+
         UpdateCameraUniform(cam.position);
 
         vec3 light_direction;
@@ -128,9 +127,9 @@ int main(int argc, char** argv){
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-
         // Draw elements
-        DrawCube(&test_cube);
+        DrawCube(&test_cube, &cam);
+        DrawCube(&cube2, &cam);
 
         // Swap buffers
         SDL_GL_SwapWindow(window);
