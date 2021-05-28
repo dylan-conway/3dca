@@ -20,7 +20,7 @@ void GetMVP(struct Camera* cam, mat4* model, mat4 out_mvp){
         glm_rad(45),
         (float)WINDOW_W / (float)WINDOW_H,
         0.1f,
-        100.0f,
+        1000.0f,
         projection_matrix
     );
 
