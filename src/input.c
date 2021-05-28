@@ -163,7 +163,7 @@ void _UpdateKeyboard(){
 
 
 SDL_bool KeyClicked(SDL_Keycode key){
-    SDL_bool clicked;
+    SDL_bool clicked = SDL_FALSE;
     switch(key){
         case SDLK_RIGHT:
             clicked = _keyboard.clicked[RIGHT_ARROW_KEY];
@@ -194,7 +194,7 @@ SDL_bool KeyClicked(SDL_Keycode key){
 }
 
 SDL_bool KeyReleased(SDL_Keycode key){
-    SDL_bool released;
+    SDL_bool released = SDL_FALSE;
     switch(key){
         case SDLK_RIGHT:
             released = _keyboard.released[RIGHT_ARROW_KEY];
