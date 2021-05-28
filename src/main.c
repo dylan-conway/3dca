@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
@@ -14,16 +15,30 @@
 #include "defines.h"
 #include "input.h"
 
+#define X_CELLS 50
+#define Y_CELLS 50
+#define Z_CELLS 50
+
 
 SDL_GLContext ctx = NULL;
 SDL_Window* window = NULL;
-struct Camera cam;
 
 SDL_bool wireframe = SDL_FALSE;
 
+int*** main_grid = NULL;
+int*** update_grid = NULL;
+
+
 int INIT();
 
+SDL_bool CheckCell(int*** grid, int x, int y, int z);
+int CountNeighbors(int x, int y, int z);
+void UpdateCells();
+
+
 int main(int argc, char** argv){
+
+    srand(5546);
 
     // Init SDL2, OpenGL, GLEW, and create shaders
     if(INIT() == -1){
@@ -33,19 +48,55 @@ int main(int argc, char** argv){
     InitInput();
     InitCubeVAO();
 
-    cam = InitCamera();
+    main_grid = malloc(sizeof(int**) * X_CELLS);
+    for(int i = 0; i < X_CELLS; i ++){
+        main_grid[i] = malloc(sizeof(int*) * Y_CELLS);
+        for(int j = 0; j < Y_CELLS; j ++){
+            main_grid[i][j] = malloc(sizeof(int) * Z_CELLS);
+        }
+    }
 
-    struct Cube test_cube = InitCube((vec3){0.0f, 0.0f, 0.0f});
-    struct Cube cube2 = InitCube((vec3){1.0f, 0.0f, 0.0f});
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            for(int z = 0; z < Z_CELLS; z ++){
+                main_grid[x][y][z] = rand() % 2;
+            }
+        }
+    }
+
+    update_grid = malloc(sizeof(int**) * X_CELLS);
+    for(int i = 0; i < X_CELLS; i ++){
+        update_grid[i] = malloc(sizeof(int*) * Y_CELLS);
+        for(int j = 0; j < Y_CELLS; j ++){
+            update_grid[i][j] = malloc(sizeof(int) * Z_CELLS);
+        }
+    }
+
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            for(int z = 0; z < Z_CELLS; z ++){
+                update_grid[x][y][z] = 0;
+            }
+        }
+    }
+
+    Camera_Init();
+    Camera_SetPosition((vec3){0.0f, 20.0f, 50.0f});
+
+    Uint64 grid_last_update_time = SDL_GetPerformanceCounter();
+    double grid_update_interval = 0.1f;
 
     SDL_bool running = SDL_TRUE;
     SDL_Event event;
 
+    int counter = 0;
     Uint64 curr_frame_time, prev_frame_time;
     prev_frame_time = SDL_GetPerformanceCounter();
     while(running){
         curr_frame_time = SDL_GetPerformanceCounter();
         double delta = (double)(curr_frame_time - prev_frame_time) / (double)SDL_GetPerformanceFrequency();
+
+        counter ++;
 
         UpdateInput();
 
@@ -67,9 +118,10 @@ int main(int argc, char** argv){
                 case SDL_MOUSEBUTTONUP:
                     MouseHandleButtonUp(event.button.button);
                     break;
-                case SDL_MOUSEWHEEL:
+                case SDL_MOUSEWHEEL:{
                     MouseHandleWheel(event.wheel);
                     break;
+                }
             }
         }
 
@@ -88,26 +140,31 @@ int main(int argc, char** argv){
             }
         }
 
-        if(KeyDown(SDLK_d)){
-            cube2.position[0] += 10.0f * delta;
+        if(KeyDown(SDLK_RIGHT)){
+            Camera_MovePosition((vec3){50.0f * delta, 0.0f, 0.0f});
         }
 
-        if(KeyDown(SDLK_a)){
-            cube2.position[0] += -10.0f * delta;
+        if(KeyDown(SDLK_LEFT)){
+            Camera_MovePosition((vec3){-50.0f * delta, 0.0f, 0.0f});
         }
 
-        if(KeyDown(SDLK_w)){
-            cube2.position[2] += -10.0f * delta;
+        Uint64 current_time = SDL_GetPerformanceCounter();
+        double grid_update_delta_time = 
+            (double)(current_time - grid_last_update_time) / 
+            SDL_GetPerformanceFrequency();
+
+        if(grid_update_delta_time >= grid_update_interval){
+            grid_last_update_time = current_time;
+            UpdateCells();
         }
 
-        if(KeyDown(SDLK_s)){
-            cube2.position[2] += 10.0f * delta;
-        }
+        vec3 cam_position;
+        Camera_GetPosition(cam_position);
         
-        UpdateCameraUniform(cam.position);
+        UpdateCameraUniform(cam_position);
 
         vec3 light_direction;
-        glm_vec3_sub((vec3){0.0f, 0.0f, 0.0f}, cam.position, light_direction);
+        glm_vec3_sub((vec3){0.0f, 0.0f, 0.0f}, cam_position, light_direction);
         glm_vec3_normalize(light_direction);
         UpdateLightDirectionUniform(light_direction);
 
@@ -117,8 +174,15 @@ int main(int argc, char** argv){
 
 
         // Draw elements
-        DrawCube(&test_cube, &cam);
-        DrawCube(&cube2, &cam);
+        for(int x = 0; x < X_CELLS; x ++){
+            for(int y = 0; y < Y_CELLS; y ++){
+                for(int z = 0; z < Z_CELLS; z ++){
+                    if(main_grid[x][y][z]){
+                        DrawStaticCube((vec3){x, y, z});
+                    }
+                }
+            }
+        }
 
         // Swap buffers
         SDL_GL_SwapWindow(window);
@@ -132,6 +196,79 @@ int main(int argc, char** argv){
     SDL_Quit();    
 
     return 0;
+}
+
+int CountNeighbors(int x, int y, int z){
+    int count = 0;
+    for(int i = -1; i < 2; i ++){
+        for(int j = -1; j < 2; j ++){
+            for(int k = -1; k < 2; k ++){
+                if(i == 0 && j == 0 && z == 0) continue;
+                if(CheckCell(main_grid, x + i, y + j, z + k)){
+                    count ++;
+                }
+            }
+        }
+    }
+    return count;
+}
+
+SDL_bool CheckCell(int*** grid, int x, int y, int z){
+    if(x < 0 || x >= X_CELLS){
+        return SDL_FALSE;
+    }
+    if(y < 0 || y >= Y_CELLS){
+        return SDL_FALSE;
+    }
+    if(z < 0 || z >= Z_CELLS){
+        return SDL_FALSE;
+    }
+    return (SDL_bool)grid[x][y][z];
+}
+
+void UpdateCells(){
+
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            for(int z = 0; z < Z_CELLS; z ++){
+                update_grid[x][y][z] = 0;
+            }
+        }
+    }
+
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            for(int z = 0; z < Z_CELLS; z ++){
+                if(main_grid[x][y][z]){
+                    int num_neighbors = CountNeighbors(x, y, z);
+                    if(CheckCell(main_grid, x, y, z)){
+                        if(num_neighbors < 7 || num_neighbors > 15){
+                            update_grid[x][y][z] = 1;
+                        }
+                    } else {
+                        if(num_neighbors == 7 || num_neighbors == 10){
+                            update_grid[x][y][z] = 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            for(int z = 0; z < Z_CELLS; z ++){
+                if(update_grid[x][y][z]){
+                    if(main_grid[x][y][z]){
+                        main_grid[x][y][z] = 0;
+                    } else {
+                        main_grid[x][y][z] = 1;
+                    }
+                    update_grid[x][y][z] = 0;
+                }
+            }
+        }
+    }
 }
 
 int INIT(){
