@@ -1,20 +1,40 @@
 #include "camera.h"
 
-struct Camera InitCamera(){
+static struct Camera _cam;
+
+struct Camera Camera_Init(){
     struct Camera c;
-    c.position[0] = 0.0f;
-    c.position[1] = 2.0f;
-    c.position[2] = 5.0f;
-    c.up[0] = 0.0f;
-    c.up[1] = 1.0f;
-    c.up[2] = 0.0f;
-    c.target[0] = 0.0f;
-    c.target[1] = 0.0f;
-    c.target[2] = 0.0f;
+    glm_vec3_copy((vec3){0.0f, 2.0f, 5.0f}, c.position);
+    glm_vec3_copy((vec3){0.0f, 1.0f, 0.0f}, c.up);
+    glm_vec3_copy((vec3){0.0f, 0.0f, 0.0f}, c.target);
+    _cam = c;
     return c;
 }
 
-void GetMVP(struct Camera* cam, mat4* model, mat4 out_mvp){
+void Camera_SetPosition(vec3 new_position){
+    glm_vec3_copy(new_position, _cam.position);
+}
+
+void Camera_MovePosition(vec3 v){
+    vec3 old_pos;
+    glm_vec3_copy(_cam.position, old_pos);
+    glm_vec3_add(v, old_pos, _cam.position);
+}
+
+void Camera_GetPosition(vec3 out_pos){
+    glm_vec3_copy(_cam.position, out_pos);
+}
+
+void Camera_GetViewMatrix(mat4 out_view_matrix){
+    glm_lookat(
+        _cam.position,
+        _cam.target,
+        _cam.up,
+        out_view_matrix
+    );
+}
+
+void Camera_GetMVP(mat4* model, mat4 out_mvp){
     mat4 projection_matrix;
     glm_perspective(
         glm_rad(45),
@@ -24,13 +44,8 @@ void GetMVP(struct Camera* cam, mat4* model, mat4 out_mvp){
         projection_matrix
     );
 
-    mat4 view_matrix;
-    glm_lookat(
-        cam->position,
-        cam->target,
-        cam->up,
-        view_matrix
-    );
+    mat4 view_matrix = GLM_MAT4_ZERO_INIT;
+    Camera_GetViewMatrix(view_matrix);
 
     glm_mat4_mulN(
         (mat4 *[]){&projection_matrix, &view_matrix, model},
