@@ -132,6 +132,7 @@ struct Cube InitCube(vec3 position){
         .scale = GLM_VEC3_ONE_INIT
     };
     glm_vec3_copy(position, c.position);
+    glm_vec3_copy((vec3){0.5f, 0.5f, 0.5f}, c.scale);
     return c;
 }
 
@@ -160,4 +161,23 @@ void DrawCube(struct Cube* cube, struct Camera* cam){
 
     glBindVertexArray(_cube_vao);
     glDrawArrays(GL_TRIANGLES, 0, 12 * 3); // Two triangles per side
+}
+
+void DrawStaticCube(vec3 position, struct Camera* cam){
+
+    mat4 mvp = GLM_MAT4_IDENTITY_INIT;
+    mat4 mt = GLM_MAT4_IDENTITY_INIT;
+    mat4 ms = GLM_MAT4_IDENTITY_INIT;
+    mat4 model = GLM_MAT4_IDENTITY_INIT;
+
+    glm_translate(mt, position);
+    glm_scale(ms, (vec3){0.5f, 0.5f, 0.5f});
+
+    glm_mat4_mul(mt, ms, model);
+
+    GetMVP(cam, &model, mvp);
+    UpdateMVPUniform(mvp);
+
+    glBindVertexArray(_cube_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
 }
