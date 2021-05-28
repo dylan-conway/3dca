@@ -41,16 +41,66 @@ void MouseHandleWheel(SDL_MouseWheelEvent wheel_event){
 }
 
 void KeyboardHandleKeyDown(SDL_Keycode key){
-    if(key < NUM_KEYBOARD_KEYS){
-        if(!_keyboard.down[key]) _keyboard.clicked[key] = SDL_TRUE;
-        _keyboard.down[key] = SDL_TRUE;
+
+    // Arrow keys do not fall into normal ascii values, need special case for
+    // them. Store in first four slots of keyboard state arrays.
+    switch(key){
+        case SDLK_RIGHT:
+            if(!_keyboard.down[RIGHT_ARROW_KEY]) _keyboard.clicked[RIGHT_ARROW_KEY] = SDL_TRUE;
+            _keyboard.down[RIGHT_ARROW_KEY] = SDL_TRUE;
+            break;
+        case SDLK_LEFT:
+            if(!_keyboard.down[LEFT_ARROW_KEY]) _keyboard.clicked[LEFT_ARROW_KEY] = SDL_TRUE;
+            _keyboard.down[LEFT_ARROW_KEY] = SDL_TRUE;
+            break;
+        case SDLK_UP:
+            if(!_keyboard.down[UP_ARROW_KEY]) _keyboard.clicked[UP_ARROW_KEY] = SDL_TRUE;
+            _keyboard.down[UP_ARROW_KEY] = SDL_TRUE;
+            break;
+        case SDLK_DOWN:
+            if(!_keyboard.down[DOWN_ARROW_KEY]) _keyboard.clicked[DOWN_ARROW_KEY] = SDL_TRUE;
+            _keyboard.down[DOWN_ARROW_KEY] = SDL_TRUE;
+            break;
+        default:{
+            SDL_Keycode adjusted_key = key + 4;
+            if(adjusted_key < NUM_KEYBOARD_KEYS){
+                if(!_keyboard.down[adjusted_key]) _keyboard.clicked[adjusted_key] = SDL_TRUE;
+                _keyboard.down[adjusted_key] = SDL_TRUE;
+            }
+            break;
+        }
     }
 }
 
 void KeyboardHandleKeyUp(SDL_Keycode key){
-    if(key < NUM_KEYBOARD_KEYS){
-        _keyboard.down[key] = SDL_FALSE;
-        _keyboard.released[key] = SDL_TRUE;
+
+    // Same things as handle keydown, arrow keys will fall outside of keyboard state
+    // arrays so make special case and reserve first four slots for them.
+    switch(key){
+        case SDLK_RIGHT:
+            _keyboard.down[RIGHT_ARROW_KEY] = SDL_FALSE;
+            _keyboard.released[RIGHT_ARROW_KEY] = SDL_TRUE;
+            break;
+        case SDLK_LEFT:
+            _keyboard.down[LEFT_ARROW_KEY] = SDL_FALSE;
+            _keyboard.released[LEFT_ARROW_KEY] = SDL_TRUE;
+            break;
+        case SDLK_UP:
+            _keyboard.down[UP_ARROW_KEY] = SDL_FALSE;
+            _keyboard.released[UP_ARROW_KEY] = SDL_TRUE;
+            break;
+        case SDLK_DOWN:
+            _keyboard.down[DOWN_ARROW_KEY] = SDL_FALSE;
+            _keyboard.released[DOWN_ARROW_KEY] = SDL_TRUE;
+            break;
+        default:{
+            SDL_Keycode adjusted_key = key + 4;
+            if(adjusted_key < NUM_KEYBOARD_KEYS){
+                _keyboard.down[adjusted_key] = SDL_FALSE;
+                _keyboard.released[adjusted_key] = SDL_TRUE;
+            }
+            break;
+        }
     }
 }
 
@@ -113,17 +163,79 @@ void _UpdateKeyboard(){
 
 
 SDL_bool KeyClicked(SDL_Keycode key){
-    SDL_bool clicked = _keyboard.clicked[key];
-    _keyboard.clicked[key] = SDL_FALSE;
+    SDL_bool clicked;
+    switch(key){
+        case SDLK_RIGHT:
+            clicked = _keyboard.clicked[RIGHT_ARROW_KEY];
+            _keyboard.clicked[RIGHT_ARROW_KEY] = SDL_FALSE;
+            break;
+        case SDLK_LEFT:
+            clicked = _keyboard.clicked[LEFT_ARROW_KEY];
+            _keyboard.clicked[LEFT_ARROW_KEY] = SDL_FALSE;
+            break;
+        case SDLK_UP:
+            clicked = _keyboard.clicked[UP_ARROW_KEY];
+            _keyboard.clicked[UP_ARROW_KEY] = SDL_FALSE;
+            break;
+        case SDLK_DOWN:
+            clicked = _keyboard.clicked[DOWN_ARROW_KEY];
+            _keyboard.clicked[DOWN_ARROW_KEY] = SDL_FALSE;
+            break;
+        default:{
+            SDL_Keycode adjusted_key = key + 4;
+            if(adjusted_key < NUM_KEYBOARD_KEYS){
+                clicked = _keyboard.clicked[adjusted_key];
+                _keyboard.clicked[adjusted_key] = SDL_FALSE;
+            }
+            break;
+        }
+    }
     return clicked;
 }
 
 SDL_bool KeyReleased(SDL_Keycode key){
-    SDL_bool released = _keyboard.released[key];
-    _keyboard.released[key] = SDL_FALSE;
+    SDL_bool released;
+    switch(key){
+        case SDLK_RIGHT:
+            released = _keyboard.released[RIGHT_ARROW_KEY];
+            _keyboard.released[RIGHT_ARROW_KEY] = SDL_FALSE;
+            break;
+        case SDLK_LEFT:
+            released = _keyboard.released[LEFT_ARROW_KEY];
+            _keyboard.released[LEFT_ARROW_KEY] = SDL_FALSE;
+            break;
+        case SDLK_UP:
+            released = _keyboard.released[UP_ARROW_KEY];
+            _keyboard.released[UP_ARROW_KEY] = SDL_FALSE;
+            break;
+        case SDLK_DOWN:
+            released = _keyboard.released[DOWN_ARROW_KEY];
+            _keyboard.released[DOWN_ARROW_KEY] = SDL_FALSE;
+            break;
+        default:{
+            SDL_Keycode adjusted_key = key + 4;
+            if(adjusted_key < NUM_KEYBOARD_KEYS){
+                released = _keyboard.released[adjusted_key];
+                _keyboard.released[adjusted_key] = SDL_FALSE;
+            }
+            break;
+        }
+    }
     return released;
 }
 
 SDL_bool KeyDown(SDL_Keycode key){
-    return _keyboard.down[key];
+    switch(key){
+        case SDLK_RIGHT: return _keyboard.down[RIGHT_ARROW_KEY];
+        case SDLK_LEFT: return _keyboard.down[LEFT_ARROW_KEY];
+        case SDLK_UP: return _keyboard.down[UP_ARROW_KEY];
+        case SDLK_DOWN: return _keyboard.down[DOWN_ARROW_KEY];
+        default:{
+            SDL_Keycode adjusted_key = key + 4;
+            if(adjusted_key < NUM_KEYBOARD_KEYS){
+                return _keyboard.down[adjusted_key];
+            }
+        }
+    }
+    return SDL_FALSE;
 }

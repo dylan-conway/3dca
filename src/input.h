@@ -18,6 +18,13 @@ struct Mouse {
     SDL_bool clicked[NUM_MOUSE_BUTTONS];
 };
 
+enum ARROW_KEYS {
+    RIGHT_ARROW_KEY = 0,
+    LEFT_ARROW_KEY,
+    UP_ARROW_KEY,
+    DOWN_ARROW_KEY
+};
+
 struct Keyboard {
     SDL_bool down[NUM_KEYBOARD_KEYS];
     SDL_bool released[NUM_KEYBOARD_KEYS];

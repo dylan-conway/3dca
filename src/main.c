@@ -87,14 +87,6 @@ int main(int argc, char** argv){
             }
         }
 
-        if(ButtonClicked(SDL_BUTTON_LEFT)){
-            printf("LEFT BUTTON CLICKED\n");
-        }
-
-        if(ButtonReleased(SDL_BUTTON_LEFT)){
-            printf("LEFT BUTTON RELEASED\n");
-        }
-
         if(KeyDown(SDLK_d)){
             cube2.position[0] += 10.0f * delta;
         }
@@ -110,11 +102,7 @@ int main(int argc, char** argv){
         if(KeyDown(SDLK_s)){
             cube2.position[2] += 10.0f * delta;
         }
-
-        if(KeyClicked(SDLK_z)){
-            SetScaleCube(&cube2, (vec3){3.0f, 1.0f, 1.0f});
-        }
-
+        
         UpdateCameraUniform(cam.position);
 
         vec3 light_direction;
