@@ -15,11 +15,6 @@
 #include "defines.h"
 #include "input.h"
 
-#define X_CELLS 50
-#define Y_CELLS 50
-#define Z_CELLS 50
-
-
 SDL_GLContext ctx = NULL;
 SDL_Window* window = NULL;
 
@@ -30,6 +25,8 @@ int*** update_grid = NULL;
 
 
 int INIT();
+
+double GetDeltaTime(Uint64 start_time, Uint64 end_time);
 
 SDL_bool CheckCell(int*** grid, int x, int y, int z);
 int CountNeighbors(int x, int y, int z);
@@ -81,10 +78,9 @@ int main(int argc, char** argv){
     }
 
     Camera_Init();
-    Camera_SetPosition((vec3){0.0f, 20.0f, 50.0f});
+    Camera_SetPosition((vec3){0.0f, 15.0f, 70.0f});
 
     Uint64 grid_last_update_time = SDL_GetPerformanceCounter();
-    double grid_update_interval = 0.1f;
 
     SDL_bool running = SDL_TRUE;
     SDL_Event event;
@@ -94,7 +90,7 @@ int main(int argc, char** argv){
     prev_frame_time = SDL_GetPerformanceCounter();
     while(running){
         curr_frame_time = SDL_GetPerformanceCounter();
-        double delta = (double)(curr_frame_time - prev_frame_time) / (double)SDL_GetPerformanceFrequency();
+        double delta = GetDeltaTime(prev_frame_time, curr_frame_time);
 
         counter ++;
 
@@ -140,6 +136,23 @@ int main(int argc, char** argv){
             }
         }
 
+        if(ButtonDown(SDL_BUTTON_LEFT)){
+            vec3 cam_position;
+            Camera_GetPosition(cam_position);
+
+            vec2 curr_mouse_pos, prev_mouse_pos;
+            Mouse_GetCurrPos(curr_mouse_pos);
+            Mouse_GetPrevPos(prev_mouse_pos);
+
+            // float mouse_diff_x = curr_mouse_pos[0] - prev_mouse_pos[0];
+
+            float cam_x = cam_position[0];
+            float cam_y = cam_position[1];
+            float cam_z = cam_position[2];
+            
+            Camera_SetPosition((vec3){cam_x, cam_y, cam_z});
+        }
+
         if(KeyDown(SDLK_RIGHT)){
             Camera_MovePosition((vec3){50.0f * delta, 0.0f, 0.0f});
         }
@@ -149,11 +162,8 @@ int main(int argc, char** argv){
         }
 
         Uint64 current_time = SDL_GetPerformanceCounter();
-        double grid_update_delta_time = 
-            (double)(current_time - grid_last_update_time) / 
-            SDL_GetPerformanceFrequency();
-
-        if(grid_update_delta_time >= grid_update_interval){
+        double grid_update_delta_time = GetDeltaTime(grid_last_update_time, current_time);
+        if(grid_update_delta_time >= GRID_UPDATE_INTERVAL){
             grid_last_update_time = current_time;
             UpdateCells();
         }
@@ -178,7 +188,7 @@ int main(int argc, char** argv){
             for(int y = 0; y < Y_CELLS; y ++){
                 for(int z = 0; z < Z_CELLS; z ++){
                     if(main_grid[x][y][z]){
-                        DrawStaticCube((vec3){x, y, z});
+                        DrawStaticCube((vec3){x - X_CELLS / 2, y - Y_CELLS / 2, z - Z_CELLS / 2});
                     }
                 }
             }
@@ -197,6 +207,11 @@ int main(int argc, char** argv){
 
     return 0;
 }
+
+double GetDeltaTime(Uint64 start_time, Uint64 end_time){
+    return (double)(end_time - start_time) / SDL_GetPerformanceFrequency();
+}
+
 
 int CountNeighbors(int x, int y, int z){
     int count = 0;
@@ -236,19 +251,23 @@ void UpdateCells(){
         }
     }
 
+    /**
+     * Interesting rules:
+     * - B 8-11 S 11-16
+     */
     for(int x = 0; x < X_CELLS; x ++){
         for(int y = 0; y < Y_CELLS; y ++){
             for(int z = 0; z < Z_CELLS; z ++){
-                if(main_grid[x][y][z]){
-                    int num_neighbors = CountNeighbors(x, y, z);
-                    if(CheckCell(main_grid, x, y, z)){
-                        if(num_neighbors < 7 || num_neighbors > 15){
-                            update_grid[x][y][z] = 1;
-                        }
-                    } else {
-                        if(num_neighbors == 7 || num_neighbors == 10){
-                            update_grid[x][y][z] = 1;
-                        }
+                int num_neighbors = CountNeighbors(x, y, z);
+                if(CheckCell(main_grid, x, y, z)){
+                    // S
+                    if(num_neighbors < 11 || num_neighbors > 16){
+                        update_grid[x][y][z] = 1;
+                    }
+                } else {
+                    // B
+                    if(num_neighbors >= 8 && num_neighbors <= 11){
+                        update_grid[x][y][z] = 1;
                     }
                 }
             }
@@ -278,6 +297,11 @@ int INIT(){
         printf("SDL INIT FAILED\n");
         return -1;
     }
+
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
