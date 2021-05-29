@@ -45,6 +45,7 @@ void MouseHandleWheel(SDL_MouseWheelEvent wheel_event);
 
 void Mouse_GetCurrPos(vec2 out_curr_pos);
 void Mouse_GetPrevPos(vec2 out_prev_pos);
+SDL_bool Mouse_WheelMoved(Sint32* out_movement);
 
 
 /**

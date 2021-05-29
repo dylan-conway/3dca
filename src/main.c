@@ -21,11 +21,8 @@ SDL_bool running = SDL_TRUE;
 
 SDL_bool wireframe = SDL_FALSE;
 
-double camera_radius_from_origin = 70.0f;
-
 int*** main_grid = NULL;
 int*** update_grid = NULL;
-
 
 int INIT();
 void UPDATE();
@@ -51,7 +48,7 @@ int main(int argc, char** argv){
     InitInput();
     InitCubeVAO();
     Camera_Init();
-    Camera_SetPosition((vec3){0.0f, 15.0f, 70.0f});
+    Camera_SetPosition((vec3){0.0f, 25.0f, 70.0f});
 
     main_grid = malloc(sizeof(int**) * X_CELLS);
     for(int i = 0; i < X_CELLS; i ++){
@@ -138,6 +135,14 @@ int main(int argc, char** argv){
             }
         }
 
+        Sint32 wheel_move;
+        if(Mouse_WheelMoved(&wheel_move)){
+            // Sint32 wheel_move = Mouse_GetWheelMovement();
+            // double step = 10.0f;
+            // // camera_radius_from_origin += wheel_move * step * delta;
+            // Camera_MovePosition((vec3){0.0f, wheel_move, wheel_move});
+        }
+
         if(ButtonDown(SDL_BUTTON_LEFT)){
 
             vec3 cam_position;
@@ -150,7 +155,7 @@ int main(int argc, char** argv){
             float mouse_diff_x = curr_mouse_pos[0] - prev_mouse_pos[0];
             if(mouse_diff_x != 0){
                 double rotation_step = mouse_diff_x * delta * 0.5f;
-                Camera_RotateAroundOrigin(rotation_step, camera_radius_from_origin);
+                Camera_RotateAroundOrigin(rotation_step);
             }
         }
 

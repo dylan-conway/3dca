@@ -128,6 +128,14 @@ void _InitMouse(){
     SDL_memset(_mouse.clicked, SDL_FALSE, sizeof(SDL_bool) * NUM_MOUSE_BUTTONS);
 }
 
+SDL_bool Mouse_WheelMoved(Sint32* out_movement){
+    *out_movement = _mouse.wheel_move;
+    _mouse.wheel_move = 0;
+    SDL_bool moved = _mouse.wheel_moved;
+    _mouse.wheel_moved = SDL_FALSE;
+    return moved;
+}
+
 void _UpdateMouse(){
     glm_vec2_copy(_mouse.curr_pos, _mouse.prev_pos);
     int x, y;

@@ -25,7 +25,7 @@ void Camera_GetPosition(vec3 out_pos){
     glm_vec3_copy(_cam.position, out_pos);
 }
 
-void Camera_RotateAroundOrigin(double step, double radius){
+void Camera_RotateAroundOrigin(double step){
 
      // Rotate camera around origin.
     // This helped a ton:
@@ -33,6 +33,8 @@ void Camera_RotateAroundOrigin(double step, double radius){
     
     vec3 new_cam_pos;
     Camera_GetPosition(new_cam_pos);
+
+    double radius = sqrt(pow(new_cam_pos[0], 2) + pow(new_cam_pos[2], 2));
 
     double angle = atan2(new_cam_pos[2], new_cam_pos[0]);    
     angle += step;
