@@ -26,6 +26,10 @@ void Camera_GetPosition(vec3 out_pos){
 }
 
 void Camera_RotateAroundOrigin(double step, double radius){
+
+     // Rotate camera around origin.
+    // This helped a ton:
+    // https://gamedev.stackexchange.com/questions/31218/how-to-move-an-object-along-a-circumference-of-another-object
     
     vec3 new_cam_pos;
     Camera_GetPosition(new_cam_pos);
