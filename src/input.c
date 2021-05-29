@@ -40,6 +40,15 @@ void MouseHandleWheel(SDL_MouseWheelEvent wheel_event){
     _mouse.wheel_moved = SDL_TRUE;
 }
 
+void Mouse_GetCurrPos(vec2 out_curr_pos){
+    glm_vec2_copy(_mouse.curr_pos, out_curr_pos);
+}
+
+void Mouse_GetPrevPos(vec2 out_prev_pos){
+    glm_vec2_copy(_mouse.prev_pos, out_prev_pos);
+}
+
+
 void KeyboardHandleKeyDown(SDL_Keycode key){
 
     // Arrow keys do not fall into normal ascii values, need special case for
@@ -123,8 +132,7 @@ void _UpdateMouse(){
     glm_vec2_copy(_mouse.curr_pos, _mouse.prev_pos);
     int x, y;
     SDL_GetMouseState(&x, &y);
-    _mouse.curr_pos[0] = x;
-    _mouse.curr_pos[1] = y;
+    glm_vec2_copy((vec2){x, y}, _mouse.curr_pos);
     _mouse.wheel_move = 0;
     _mouse.wheel_moved = SDL_FALSE;
 

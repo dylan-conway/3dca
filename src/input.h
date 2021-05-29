@@ -43,6 +43,9 @@ void MouseHandleButtonDown(Uint8 button);
 void MouseHandleButtonUp(Uint8 button);
 void MouseHandleWheel(SDL_MouseWheelEvent wheel_event);
 
+void Mouse_GetCurrPos(vec2 out_curr_pos);
+void Mouse_GetPrevPos(vec2 out_prev_pos);
+
 
 /**
  * Check if a key is clicked. Will only happen once per button press.
