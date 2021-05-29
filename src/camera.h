@@ -21,6 +21,7 @@ struct Camera Camera_Init();
 void Camera_SetPosition(vec3 new_position);
 void Camera_MovePosition(vec3 v);
 void Camera_GetPosition(vec3 out_pos);
+void Camera_RotateAroundOrigin(double step, double radius);
 void Camera_GetViewMatrix(mat4 out_view_matrix);
 void Camera_GetMVP(mat4* model, mat4 out_mvp);
 

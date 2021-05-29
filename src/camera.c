@@ -25,6 +25,20 @@ void Camera_GetPosition(vec3 out_pos){
     glm_vec3_copy(_cam.position, out_pos);
 }
 
+void Camera_RotateAroundOrigin(double step, double radius){
+    
+    vec3 new_cam_pos;
+    Camera_GetPosition(new_cam_pos);
+
+    double angle = atan2(new_cam_pos[2], new_cam_pos[0]);    
+    angle += step;
+
+    new_cam_pos[0] = cos(angle) * radius;
+    new_cam_pos[2] = sin(angle) * radius;
+
+    Camera_SetPosition(new_cam_pos);
+}
+
 void Camera_GetViewMatrix(mat4 out_view_matrix){
     glm_lookat(
         _cam.position,

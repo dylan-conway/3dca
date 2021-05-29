@@ -17,14 +17,20 @@
 
 SDL_GLContext ctx = NULL;
 SDL_Window* window = NULL;
+SDL_bool running = SDL_TRUE;
 
 SDL_bool wireframe = SDL_FALSE;
+
+double camera_radius_from_origin = 70.0f;
 
 int*** main_grid = NULL;
 int*** update_grid = NULL;
 
 
 int INIT();
+void UPDATE();
+void DRAW();
+void FREE();
 
 double GetDeltaTime(Uint64 start_time, Uint64 end_time);
 
@@ -44,6 +50,8 @@ int main(int argc, char** argv){
 
     InitInput();
     InitCubeVAO();
+    Camera_Init();
+    Camera_SetPosition((vec3){0.0f, 15.0f, 70.0f});
 
     main_grid = malloc(sizeof(int**) * X_CELLS);
     for(int i = 0; i < X_CELLS; i ++){
@@ -77,25 +85,16 @@ int main(int argc, char** argv){
         }
     }
 
-    Camera_Init();
-    Camera_SetPosition((vec3){0.0f, 15.0f, 70.0f});
-
     Uint64 grid_last_update_time = SDL_GetPerformanceCounter();
-
-    SDL_bool running = SDL_TRUE;
     SDL_Event event;
-
-    int counter = 0;
     Uint64 curr_frame_time, prev_frame_time;
     prev_frame_time = SDL_GetPerformanceCounter();
     while(running){
         curr_frame_time = SDL_GetPerformanceCounter();
         double delta = GetDeltaTime(prev_frame_time, curr_frame_time);
 
-        counter ++;
-
+        // Process user input
         UpdateInput();
-
         while(SDL_PollEvent(&event)){
             switch(event.type){
                 case SDL_QUIT:
@@ -121,6 +120,9 @@ int main(int argc, char** argv){
             }
         }
 
+
+        // Update draw modes, camera position, object state
+
         if(KeyClicked(SDLK_ESCAPE)){
             running = SDL_FALSE;
             continue;
@@ -137,6 +139,11 @@ int main(int argc, char** argv){
         }
 
         if(ButtonDown(SDL_BUTTON_LEFT)){
+
+            // Rotate camera around origin.
+            // This helped a ton:
+            // https://gamedev.stackexchange.com/questions/31218/how-to-move-an-object-along-a-circumference-of-another-object
+
             vec3 cam_position;
             Camera_GetPosition(cam_position);
 
@@ -144,23 +151,15 @@ int main(int argc, char** argv){
             Mouse_GetCurrPos(curr_mouse_pos);
             Mouse_GetPrevPos(prev_mouse_pos);
 
-            // float mouse_diff_x = curr_mouse_pos[0] - prev_mouse_pos[0];
-
-            float cam_x = cam_position[0];
-            float cam_y = cam_position[1];
-            float cam_z = cam_position[2];
-            
-            Camera_SetPosition((vec3){cam_x, cam_y, cam_z});
+            float mouse_diff_x = curr_mouse_pos[0] - prev_mouse_pos[0];
+            if(mouse_diff_x != 0){
+                double rotation_step = mouse_diff_x * delta * 0.5f;
+                Camera_RotateAroundOrigin(rotation_step, camera_radius_from_origin);
+            }
         }
 
-        if(KeyDown(SDLK_RIGHT)){
-            Camera_MovePosition((vec3){50.0f * delta, 0.0f, 0.0f});
-        }
 
-        if(KeyDown(SDLK_LEFT)){
-            Camera_MovePosition((vec3){-50.0f * delta, 0.0f, 0.0f});
-        }
-
+        // Update the cells if enough time has passed.
         Uint64 current_time = SDL_GetPerformanceCounter();
         double grid_update_delta_time = GetDeltaTime(grid_last_update_time, current_time);
         if(grid_update_delta_time >= GRID_UPDATE_INTERVAL){
@@ -168,34 +167,19 @@ int main(int argc, char** argv){
             UpdateCells();
         }
 
+
+        // Update uniforms with new camera position
         vec3 cam_position;
         Camera_GetPosition(cam_position);
-        
         UpdateCameraUniform(cam_position);
-
         vec3 light_direction;
         glm_vec3_sub((vec3){0.0f, 0.0f, 0.0f}, cam_position, light_direction);
         glm_vec3_normalize(light_direction);
         UpdateLightDirectionUniform(light_direction);
 
-        // Clear window
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
-        // Draw elements
-        for(int x = 0; x < X_CELLS; x ++){
-            for(int y = 0; y < Y_CELLS; y ++){
-                for(int z = 0; z < Z_CELLS; z ++){
-                    if(main_grid[x][y][z]){
-                        DrawStaticCube((vec3){x - X_CELLS / 2, y - Y_CELLS / 2, z - Z_CELLS / 2});
-                    }
-                }
-            }
-        }
-
-        // Swap buffers
-        SDL_GL_SwapWindow(window);
+        // Draw updated objects
+        DRAW();
+        
 
         prev_frame_time = curr_frame_time;
     }
@@ -206,6 +190,28 @@ int main(int argc, char** argv){
     SDL_Quit();    
 
     return 0;
+}
+
+void DRAW(){
+
+    // Clear window
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
+    // Draw elements
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            for(int z = 0; z < Z_CELLS; z ++){
+                if(main_grid[x][y][z]){
+                    DrawStaticCube((vec3){x - X_CELLS / 2, y - Y_CELLS / 2, z - Z_CELLS / 2});
+                }
+            }
+        }
+    }
+
+    // Swap buffers
+    SDL_GL_SwapWindow(window);
 }
 
 double GetDeltaTime(Uint64 start_time, Uint64 end_time){
