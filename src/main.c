@@ -15,9 +15,15 @@
 #include "defines.h"
 #include "input.h"
 
+enum STATE {
+    EDITOR,
+    SIMULATION
+};
+
 SDL_GLContext ctx = NULL;
 SDL_Window* window = NULL;
 SDL_bool running = SDL_TRUE;
+enum STATE state = EDITOR;
 
 SDL_bool wireframe = SDL_FALSE;
 
@@ -87,8 +93,10 @@ int main(int argc, char** argv){
     Uint64 curr_frame_time, prev_frame_time;
     prev_frame_time = SDL_GetPerformanceCounter();
     while(running){
+
         curr_frame_time = SDL_GetPerformanceCounter();
         double delta = GetDeltaTime(prev_frame_time, curr_frame_time);
+        delta ++;
 
         // Process user input
         UpdateInput();
@@ -118,14 +126,14 @@ int main(int argc, char** argv){
         }
 
 
-        // Update draw modes, camera position, object state
+        // Update program state from user input
 
         if(KeyClicked(SDLK_ESCAPE)){
             running = SDL_FALSE;
             continue;
         }
 
-        if(KeyClicked(SDLK_SPACE)){
+        if(KeyClicked(SDLK_w)){
             if(wireframe){
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
                 wireframe = SDL_FALSE;
@@ -135,15 +143,20 @@ int main(int argc, char** argv){
             }
         }
 
+
+
         Sint32 wheel_move;
         if(Mouse_WheelMoved(&wheel_move)){
+
+            // TODO: ZOOM
+
             // Sint32 wheel_move = Mouse_GetWheelMovement();
             // double step = 10.0f;
             // // camera_radius_from_origin += wheel_move * step * delta;
             // Camera_MovePosition((vec3){0.0f, wheel_move, wheel_move});
         }
 
-        if(ButtonDown(SDL_BUTTON_LEFT)){
+        if(ButtonDown(SDL_BUTTON_MIDDLE)){
 
             vec3 cam_position;
             Camera_GetPosition(cam_position);
@@ -154,20 +167,10 @@ int main(int argc, char** argv){
 
             float mouse_diff_x = curr_mouse_pos[0] - prev_mouse_pos[0];
             if(mouse_diff_x != 0){
-                double rotation_step = mouse_diff_x * delta * 0.5f;
+                double rotation_step = mouse_diff_x  * 0.004f;
                 Camera_RotateAroundOrigin(rotation_step);
             }
         }
-
-
-        // Update the cells if enough time has passed.
-        Uint64 current_time = SDL_GetPerformanceCounter();
-        double grid_update_delta_time = GetDeltaTime(grid_last_update_time, current_time);
-        if(grid_update_delta_time >= GRID_UPDATE_INTERVAL){
-            grid_last_update_time = current_time;
-            UpdateCells();
-        }
-
 
         // Update uniforms with new camera position
         vec3 cam_position;
@@ -177,6 +180,105 @@ int main(int argc, char** argv){
         glm_vec3_sub((vec3){0.0f, 0.0f, 0.0f}, cam_position, light_direction);
         glm_vec3_normalize(light_direction);
         UpdateLightDirectionUniform(light_direction);
+
+        if(ButtonDown(SDL_BUTTON_RIGHT)){
+            
+            // Make a ray from mouse coordinates. Origin of ray is camera position
+            // https://antongerdelan.net/opengl/raycasting.html
+
+            vec2 mouse_coords;
+            Mouse_GetCurrPos(mouse_coords);
+
+            float x = (2.0f * mouse_coords[0]) / WINDOW_W - 1.0f;
+            float y = 1.0f - (2.0f * mouse_coords[1]) / WINDOW_H;
+            float z = 1.0f;
+
+            vec3 ray_nds = {x, y, z};
+
+            vec4 ray_clip = {
+                ray_nds[0],
+                ray_nds[1],
+                -1.0f, 1.0f
+            };
+
+            mat4 proj_matrix, inv_proj_matrix;
+            Camera_GetProjectionMatrix(proj_matrix);
+            glm_mat4_inv(proj_matrix, inv_proj_matrix);
+
+            vec4 ray_eye;
+            glm_mat4_mulv(inv_proj_matrix, ray_clip, ray_eye);
+            ray_eye[2] = -1.0f;
+            ray_eye[3] = 0.0f;
+
+            vec4 ray_world_temp;
+            mat4 view_matrix, inv_view_matrix;
+            Camera_GetViewMatrix(view_matrix);
+            glm_mat4_inv(view_matrix, inv_view_matrix);
+            glm_mat4_mulv(inv_view_matrix, ray_eye, ray_world_temp);
+
+            vec3 ray_world, ray_origin;
+            glm_vec3(ray_world_temp, ray_world);
+            glm_vec3_normalize(ray_world);
+            float ray_world_length = glm_vec3_norm(ray_world);
+            Camera_GetPosition(ray_origin);
+
+            float cube_delete_radius = 2.0f;
+
+            for(int x = 0; x < X_CELLS; x ++){
+                for(int y = 0; y < Y_CELLS; y ++){
+                    for(int z = 0; z < Z_CELLS; z ++){
+
+                        // Determine if a ray collides with obects in a scene
+                        // https://stackoverflow.com/questions/34251763/ray-sphere-intersections-in-opengl
+                        
+                        vec3 cube_center = {
+                            (x - X_CELLS / 2) * 1.0f,
+                            (y - Y_CELLS / 2) * 1.0f,
+                            (z - Z_CELLS / 2) * 1.0f
+                        };
+
+                        vec3 center_minus_origin;
+                        glm_vec3_sub(cube_center, ray_origin, center_minus_origin);
+
+                        vec3 cross_dir_and_center_minus_origin;
+                        glm_vec3_cross(ray_world, center_minus_origin, cross_dir_and_center_minus_origin);
+
+                        float cross_dir_and_center_minus_origin_norm = glm_vec3_norm(
+                            cross_dir_and_center_minus_origin
+                        );
+
+                        if(cross_dir_and_center_minus_origin_norm / ray_world_length < cube_delete_radius){
+                            main_grid[x][y][z] = 0;
+                        }
+
+                        
+                    }
+                }
+            }
+            
+        }
+
+        switch(state){
+
+            case EDITOR:
+                if(KeyClicked(SDLK_SPACE)){
+                    state = SIMULATION;
+                }
+                break;
+
+            case SIMULATION:
+                if(KeyClicked(SDLK_SPACE)){
+                    state = EDITOR;
+                }
+                // Update the cells if enough time has passed.
+                Uint64 current_time = SDL_GetPerformanceCounter();
+                double grid_update_delta_time = GetDeltaTime(grid_last_update_time, current_time);
+                if(grid_update_delta_time >= GRID_UPDATE_INTERVAL){
+                    grid_last_update_time = current_time;
+                    UpdateCells();
+                }
+                break;
+        }        
 
         // Draw updated objects
         DRAW();
@@ -205,7 +307,18 @@ void DRAW(){
         for(int y = 0; y < Y_CELLS; y ++){
             for(int z = 0; z < Z_CELLS; z ++){
                 if(main_grid[x][y][z]){
-                    DrawStaticCube((vec3){x - X_CELLS / 2, y - Y_CELLS / 2, z - Z_CELLS / 2});
+
+                    // Assign colors from xyz coordinate
+                    float r = (x * 3 + 130) / 255.0f;
+                    float g = (y * 1.2f + 100) / 255.0f;
+                    float b = (z * 3.5 + 100) / 255.0f;
+                    UpdateColorUniform((vec4){r, g, b, 1.0f});
+                    vec3 dst_vec = {
+                        (x - X_CELLS / 2) * 1.0f,
+                        (y - Y_CELLS / 2) * 1.0f,
+                        (z - Z_CELLS / 2) * 1.0f
+                    };
+                    DrawStaticCube(dst_vec);
                 }
             }
         }
