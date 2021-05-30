@@ -1,10 +1,10 @@
-BUILD_MODE ?= DEBUG
+BUILD_MODE ?= RELEASE
 
 TARGET = 441final
 CC = gcc
 SRC = $(wildcard src/*.c)
 OBJS := $(SRC:%.c=%.o)
-# OBJS = #icon.o
+ICONOBJ := src/icon.o
 INCLUDE_PATHS = -I"C:\mingw64\mingw64\include"
 LLIB_PATHS = -L"C:\mingw64\mingw64\lib"
 LLIBS = -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglew32 -lglu32 -lcglm
@@ -19,13 +19,16 @@ endif
 
 $(TARGET).exe : $(OBJS)
 	$(info BUILDING $(BUILD_MODE)...)
-	$(CC) $(CFLAGS) -o $@ $(OBJS) $(INCLUDE_PATHS) $(LLIB_PATHS) $(LLIBS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(ICONOBJ) $(INCLUDE_PATHS) $(LLIB_PATHS) $(LLIBS)
 
 $(OBJS): src/%.o : src/%.c
 	$(CC) $(CFLAGS) -c $< $(INCLUDE_PATHS) $(LLIB_PATHS) $(LLIBS) -o $@
 
 run:
 	./$(TARGET)
+
+icon:
+	windres -i src/icon.rc -o src/icon.o
 
 clean:
 	del $(TARGET).exe src\*.o src\*.d

@@ -31,7 +31,6 @@ int*** main_grid = NULL;
 int*** update_grid = NULL;
 
 int INIT();
-void UPDATE();
 void DRAW();
 void FREE();
 
@@ -54,7 +53,7 @@ int main(int argc, char** argv){
     InitInput();
     InitCubeVAO();
     Camera_Init();
-    Camera_SetPosition((vec3){0.0f, 25.0f, 70.0f});
+    Camera_SetPosition((vec3){0.0f, 25.0f * 1.5f, 70.0f * 1.5f});
 
     main_grid = malloc(sizeof(int**) * X_CELLS);
     for(int i = 0; i < X_CELLS; i ++){
@@ -287,10 +286,7 @@ int main(int argc, char** argv){
         prev_frame_time = curr_frame_time;
     }
 
-    DeleteShaders();
-    SDL_GL_DeleteContext(ctx);
-    SDL_DestroyWindow(window);
-    SDL_Quit();    
+    FREE();    
 
     return 0;
 }
@@ -331,7 +327,6 @@ void DRAW(){
 double GetDeltaTime(Uint64 start_time, Uint64 end_time){
     return (double)(end_time - start_time) / SDL_GetPerformanceFrequency();
 }
-
 
 int CountNeighbors(int x, int y, int z){
     int count = 0;
@@ -479,4 +474,23 @@ int INIT(){
     }
     
     return 0;
+}
+
+void FREE(){
+
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            free(main_grid[x][y]);
+            free(update_grid[x][y]);
+        }
+        free(main_grid[x]);
+        free(update_grid[x]);
+    }
+    free(main_grid);
+    free(update_grid);
+
+    DeleteShaders();
+    SDL_GL_DeleteContext(ctx);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
 }

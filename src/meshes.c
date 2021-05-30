@@ -106,7 +106,6 @@ void InitCubeVAO(){
          0.0f,   0.0f,  -1.0f,
     };
 
-    // GLuint cube_vao = 0;
     glGenVertexArrays(1, &_cube_vao);
     glBindVertexArray(_cube_vao);
 
