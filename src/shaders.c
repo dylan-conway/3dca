@@ -4,6 +4,7 @@
 static GLuint _program_id, _vshader_id, _fshader_id;
 static GLuint _mvp_uniform_location, _camera_uniform_location;
 static GLuint _light_direction_uniform_location, _lighting_coefficients_uniform_location;
+static GLuint _color_uniform_location;
 
 void _print_shader_info_log(GLuint shader_index) {
     int max_length = 2048;
@@ -47,9 +48,10 @@ const char *GetFragmentShader()
    strcpy(fragment_shader, 
            "#version 400\n"
            "in float shading;\n"
+           "uniform vec4 color;\n"
            "out vec4 frag_color;\n"
            "void main() {\n"
-           "  frag_color = vec4(1.0f, 1.0f, 1.0f, 1.0f);\n"
+           "  frag_color = color;\n"
            "  for(int i = 0; i < 3; i ++){\n"
            "    frag_color[i] = frag_color[i] * shading > 1 ? 1 : frag_color[i] * shading;\n"
            "  }\n"
@@ -95,6 +97,7 @@ int CreateShaders(){
     _camera_uniform_location = glGetUniformLocation(_program_id, "camera_pos");
     _light_direction_uniform_location = glGetUniformLocation(_program_id, "light_direction");
     _lighting_coefficients_uniform_location = glGetUniformLocation(_program_id, "lighting_coefficients");
+    _color_uniform_location = glGetUniformLocation(_program_id, "color");
 
     vec4 lighting_coefficients;
     lighting_coefficients[0] = 0.3f;
@@ -125,4 +128,8 @@ void UpdateCameraUniform(vec3 camera_position){
 
 void UpdateLightDirectionUniform(vec3 light_direction){
     glUniform3fv(_light_direction_uniform_location, 1, light_direction);
+}
+
+void UpdateColorUniform(vec4 color){
+    glUniform4fv(_color_uniform_location, 1, color);
 }

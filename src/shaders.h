@@ -17,5 +17,6 @@ void DeleteShaders();
 void UpdateMVPUniform(mat4 mvp);
 void UpdateCameraUniform(vec3 camera_position);
 void UpdateLightDirectionUniform(vec3 light_direction);
+void UpdateColorUniform(vec4 color);
 
 #endif
