@@ -54,15 +54,18 @@ void Camera_GetViewMatrix(mat4 out_view_matrix){
     );
 }
 
-void Camera_GetMVP(mat4* model, mat4 out_mvp){
-    mat4 projection_matrix;
+void Camera_GetProjectionMatrix(mat4 out_proj_matrix){
     glm_perspective(
         glm_rad(45),
         (float)WINDOW_W / (float)WINDOW_H,
-        0.1f,
-        1000.0f,
-        projection_matrix
+        0.1f, 1000.0f,
+        out_proj_matrix
     );
+}
+
+void Camera_GetMVP(mat4* model, mat4 out_mvp){
+    mat4 projection_matrix;
+    Camera_GetProjectionMatrix(projection_matrix);
 
     mat4 view_matrix = GLM_MAT4_ZERO_INIT;
     Camera_GetViewMatrix(view_matrix);

@@ -23,6 +23,7 @@ void Camera_MovePosition(vec3 v);
 void Camera_GetPosition(vec3 out_pos);
 void Camera_RotateAroundOrigin(double step);
 void Camera_GetViewMatrix(mat4 out_view_matrix);
+void Camera_GetProjectionMatrix(mat4 out_proj_matrix);
 void Camera_GetMVP(mat4* model, mat4 out_mvp);
 
 #endif
