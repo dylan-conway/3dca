@@ -29,7 +29,67 @@ enum STATE state = EDITOR;
 SDL_bool wireframe = SDL_FALSE;
 
 int*** main_grid = NULL;
-int*** update_grid = NULL;
+double grid_update_interval = 0.5f;
+
+int update_counter = 1;
+
+struct CA_rules {
+    char* name;
+
+    int num_survive_bounds;
+    int* survive_bounds;
+
+    int num_born_bounds;
+    int* born_bounds;
+
+    int num_states;
+    char neighborhood;
+};
+
+#define NUM_RULES 6
+
+int current_rule = 5;
+
+struct CA_rules rules[NUM_RULES] = {
+    {
+        "Builder 2", 1, NULL, 1, NULL, 2, 'M'
+    },
+    {
+        "Clouds 1", 1, NULL, 2, NULL, 2, 'M'
+    },
+    {
+        "Crystal Growth 1", 1, NULL, 2, NULL, 5, 'N'
+    },
+    {
+        "Pulse Waves", 1, NULL, 1, NULL, 10, 'M'
+    },
+    {
+        "Slow Decay 2", 5, NULL, 1, NULL, 5, 'M'
+    },
+    {
+        "No name", 1, NULL, 1, NULL, 3, 'M'
+    }
+};
+
+int survive_bounds_counter = 0;
+int survive_bounds[] = {
+    5, 7,
+    13, 26,
+    1, 2,
+    3, 3,
+    1, 1, 4, 4, 8, 8, 11, 11, 13, 26,
+    6, 8
+};
+
+int born_bounds_counter = 0;
+int born_bounds[] = {
+    1, 1,
+    13, 14, 17, 19,
+    1, 1, 3, 3,
+    1, 3,
+    13, 26,
+    6, 8
+};
 
 int INIT();
 void DRAW();
@@ -40,11 +100,17 @@ SDL_bool RaycastHit(vec3 ray, vec3 ray_origin, vec3 object_center, float radius)
 
 double GetDeltaTime(Uint64 start_time, Uint64 end_time);
 
-SDL_bool CheckCell(int*** grid, int x, int y, int z);
+
+SDL_bool CheckCell(int x, int y, int z);
+int GetCell(int x, int y, int z);
+void IncrementCell(int x, int y, int z);
 void ClearGrid(int*** grid);
-void RandomizeGrid(int*** grid);
-int CountNeighbors(int x, int y, int z);
+void FillGrid();
+void RandomizeGrid();
+int CountMooreNeighbors(int x, int y, int z);
+int CountNeumannNeighbors(int x, int y, int z);
 void UpdateCells();
+void SwitchRule(int new_rule_index);
 
 
 int main(int argc, char** argv){
@@ -59,7 +125,52 @@ int main(int argc, char** argv){
     InitInput();
     InitCubeVAO();
     Camera_Init();
-    Camera_SetPosition((vec3){0.0f, 25.0f * 1.5f, 70.0f * 1.5f});
+    Camera_SetPosition((vec3){0.0f, 25.0f * 1.3f, 70.0f * 1.3f});
+
+    for(int i = 0; i < NUM_RULES; i ++){
+        rules[i].survive_bounds = malloc(sizeof(int) * rules[i].num_survive_bounds * 2);
+        rules[i].born_bounds = malloc(sizeof(int) * rules[i].num_born_bounds * 2);
+        for(int j = 0; j < rules[i].num_survive_bounds * 2; j += 2){
+            rules[i].survive_bounds[j] = survive_bounds[survive_bounds_counter];
+            survive_bounds_counter ++;
+            rules[i].survive_bounds[j + 1] = survive_bounds[survive_bounds_counter];
+            survive_bounds_counter ++;
+        }
+        for(int j = 0; j < rules[i].num_born_bounds * 2; j += 2){
+            rules[i].born_bounds[j] = born_bounds[born_bounds_counter];
+            born_bounds_counter ++;
+            rules[i].born_bounds[j + 1] = born_bounds[born_bounds_counter];
+            born_bounds_counter ++;
+        }
+    }
+
+    printf("\nRULES\n");
+    for(int i = 0; i < NUM_RULES; i ++){
+        printf("%s: ", rules[i].name);
+        for(int j = 0; j < rules[i].num_survive_bounds * 2; j += 2){
+            if(rules[i].survive_bounds[j] == rules[i].survive_bounds[j + 1]){
+                printf("%d", rules[i].survive_bounds[j]);
+            } else {
+                printf("%d-%d", rules[i].survive_bounds[j], rules[i].survive_bounds[j + 1]);
+            }
+            if(j != rules[i].num_survive_bounds * 2 - 2){
+                printf(",");
+            }
+        }
+        printf("/");
+        for(int j = 0; j < rules[i].num_born_bounds * 2; j += 2){
+            if(rules[i].born_bounds[j] == rules[i].born_bounds[j + 1]){
+                printf("%d", rules[i].born_bounds[j]);
+            } else {
+                printf("%d-%d", rules[i].born_bounds[j], rules[i].born_bounds[j + 1]);
+            }
+            if(j != rules[i].num_born_bounds * 2 - 2){
+                printf(",");
+            }
+        }
+        printf("/%d/%c\n", rules[i].num_states, rules[i].neighborhood);
+    }
+    printf("\n");
 
     main_grid = malloc(sizeof(int**) * X_CELLS);
     for(int i = 0; i < X_CELLS; i ++){
@@ -69,16 +180,9 @@ int main(int argc, char** argv){
         }
     }
 
-    update_grid = malloc(sizeof(int**) * X_CELLS);
-    for(int i = 0; i < X_CELLS; i ++){
-        update_grid[i] = malloc(sizeof(int*) * Y_CELLS);
-        for(int j = 0; j < Y_CELLS; j ++){
-            update_grid[i][j] = malloc(sizeof(int) * Z_CELLS);
-        }
-    }
+    ClearGrid(main_grid);
 
-    RandomizeGrid(main_grid);
-    ClearGrid(update_grid);
+    SwitchRule(current_rule);
 
     Uint64 grid_last_update_time = SDL_GetPerformanceCounter();
     SDL_Event event;
@@ -140,7 +244,33 @@ int main(int argc, char** argv){
         }
 
         if(KeyClicked(SDLK_r)){
-            RandomizeGrid(main_grid);
+            RandomizeGrid();
+        }
+
+        if(KeyClicked(SDLK_f)){
+            FillGrid();
+        }
+
+        if(KeyDown(SDLK_s)){
+            int next_rule = current_rule + 1;
+            if(next_rule >= NUM_RULES){
+                next_rule = 0;
+            }
+            SwitchRule(next_rule);
+        }
+
+        if(KeyClicked(SDLK_DOWN)){
+            grid_update_interval += 0.1f;
+            if(grid_update_interval > 0.5f){
+                grid_update_interval = 0.5f;
+            }
+        }
+
+        if(KeyClicked(SDLK_UP)){
+            grid_update_interval -= 0.1f;
+            if(grid_update_interval < 0.1f){
+                grid_update_interval = 0.1f;
+            }
         }
 
 
@@ -163,14 +293,8 @@ int main(int argc, char** argv){
 
             float mouse_diff_x = curr_mouse_pos[0] - prev_mouse_pos[0];
             if(mouse_diff_x != 0){
-                double rotation_step = mouse_diff_x  * 0.004f;
+                double rotation_step = mouse_diff_x / 3 * 0.01f;
                 Camera_RotateAroundOrigin(rotation_step);
-            }
-
-            float mouse_diff_y = curr_mouse_pos[1] - prev_mouse_pos[1];
-            if(mouse_diff_y != 0){
-                double rotation_step = mouse_diff_y * 0.004f;
-                Camera_RotateAroundOriginY(rotation_step);
             }
         }
 
@@ -258,7 +382,7 @@ int main(int argc, char** argv){
                 // Update the cells if enough time has passed.
                 Uint64 current_time = SDL_GetPerformanceCounter();
                 double grid_update_delta_time = GetDeltaTime(grid_last_update_time, current_time);
-                if(grid_update_delta_time >= GRID_UPDATE_INTERVAL){
+                if(grid_update_delta_time >= grid_update_interval){
                     grid_last_update_time = current_time;
                     UpdateCells();
                 }
@@ -355,7 +479,7 @@ void DRAW(){
             for(int z = 0; z < Z_CELLS; z ++){
                 if(main_grid[x][y][z]){
 
-                    // Assign colors from xyz coordinate
+                    // Assign colors from xyz coordinate (RGB cube)
                     float r = (x * 3.0f + 130) / 255.0f;
                     float g = (y * 1.2f + 100) / 255.0f;
                     float b = (z * 3.5f + 100) / 255.0f;
@@ -379,14 +503,16 @@ double GetDeltaTime(Uint64 start_time, Uint64 end_time){
     return (double)(end_time - start_time) / SDL_GetPerformanceFrequency();
 }
 
-int CountNeighbors(int x, int y, int z){
+int CountMooreNeighbors(int x, int y, int z){
     int count = 0;
     for(int i = -1; i < 2; i ++){
         for(int j = -1; j < 2; j ++){
             for(int k = -1; k < 2; k ++){
-                if(i == 0 && j == 0 && z == 0) continue;
-                if(CheckCell(main_grid, x + i, y + j, z + k)){
-                    count ++;
+                if(i == 0 && j == 0 && k == 0) continue;
+                if(CheckCell(x + i, y + j, z + k)){
+                    if(GetCell(x + i, y + j, z + k) == 1){
+                        count ++;
+                    }
                 }
             }
         }
@@ -394,7 +520,28 @@ int CountNeighbors(int x, int y, int z){
     return count;
 }
 
-SDL_bool CheckCell(int*** grid, int x, int y, int z){
+int CountNeumannNeighbors(int x, int y, int z){
+    int count = 0;
+    for(int i = -1; i < 2; i ++){
+        for(int j = -1; j < 2; j ++){
+            for(int k = -1; k < 2; k ++){
+                if(i == 0 && j == 0 && k == 0) continue;
+                SDL_bool n = SDL_FALSE;
+                if(i == 0 && j == 0) n = SDL_TRUE;
+                if(i == 0 && k == 0) n = SDL_TRUE;
+                if(j == 0 && k == 0) n = SDL_TRUE;
+                if(n && CheckCell(x + i, y + j, z + k)){
+                    if(GetCell(x + i, y + j, z + k) == 1){
+                        count ++;
+                    }
+                }
+            }
+        }
+    }
+    return count;
+}
+
+SDL_bool CheckCell(int x, int y, int z){
     if(x < 0 || x >= X_CELLS){
         return SDL_FALSE;
     }
@@ -404,7 +551,19 @@ SDL_bool CheckCell(int*** grid, int x, int y, int z){
     if(z < 0 || z >= Z_CELLS){
         return SDL_FALSE;
     }
-    return (SDL_bool)grid[x][y][z];
+    return main_grid[x][y][z] > 0;
+}
+
+// Check cell first to ensure in bounds
+int GetCell(int x, int y, int z){
+    return main_grid[x][y][z];
+}
+
+void IncrementCell(int x, int y, int z){
+    main_grid[x][y][z] ++;
+    if(main_grid[x][y][z] == rules[current_rule].num_states){
+        main_grid[x][y][z] = 0;
+    }
 }
 
 void ClearGrid(int*** grid){
@@ -417,11 +576,21 @@ void ClearGrid(int*** grid){
     }
 }
 
-void RandomizeGrid(int*** grid){
+void FillGrid(){
     for(int x = 0; x < X_CELLS; x ++){
         for(int y = 0; y < Y_CELLS; y ++){
             for(int z = 0; z < Z_CELLS; z ++){
-                grid[x][y][z] = rand() % 2;
+                main_grid[x][y][z] = 1;
+            }
+        }
+    }
+}
+
+void RandomizeGrid(){
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            for(int z = 0; z < Z_CELLS; z ++){
+                main_grid[x][y][z] = rand() % 2;
             }
         }
     }
@@ -429,32 +598,18 @@ void RandomizeGrid(int*** grid){
 
 void UpdateCells(){
 
-    for(int x = 0; x < X_CELLS; x ++){
-        for(int y = 0; y < Y_CELLS; y ++){
-            for(int z = 0; z < Z_CELLS; z ++){
-                update_grid[x][y][z] = 0;
-            }
-        }
-    }
+    int num_survive_bounds = rules[current_rule].num_survive_bounds;
+    int num_born_bounds = rules[current_rule].num_born_bounds;
+    char nbh = rules[current_rule].neighborhood;
 
-    /**
-     * Interesting rules:
-     * - B 8-11 S 11-16
-     */
+    int num_neighbors[X_CELLS][Y_CELLS][Z_CELLS];
     for(int x = 0; x < X_CELLS; x ++){
         for(int y = 0; y < Y_CELLS; y ++){
             for(int z = 0; z < Z_CELLS; z ++){
-                int num_neighbors = CountNeighbors(x, y, z);
-                if(CheckCell(main_grid, x, y, z)){
-                    // S
-                    if(num_neighbors < 11 || num_neighbors > 16){
-                        update_grid[x][y][z] = 1;
-                    }
-                } else {
-                    // B
-                    if(num_neighbors >= 8 && num_neighbors <= 11){
-                        update_grid[x][y][z] = 1;
-                    }
+                if(nbh == 'M'){
+                    num_neighbors[x][y][z] = CountMooreNeighbors(x, y, z);
+                } else if(nbh == 'N'){
+                    num_neighbors[x][y][z] = CountNeumannNeighbors(x, y, z);
                 }
             }
         }
@@ -463,13 +618,53 @@ void UpdateCells(){
     for(int x = 0; x < X_CELLS; x ++){
         for(int y = 0; y < Y_CELLS; y ++){
             for(int z = 0; z < Z_CELLS; z ++){
-                if(update_grid[x][y][z]){
-                    if(main_grid[x][y][z]){
-                        main_grid[x][y][z] = 0;
-                    } else {
-                        main_grid[x][y][z] = 1;
+
+                int nn = num_neighbors[x][y][z];
+                int cell = GetCell(x, y, z);
+
+                switch(cell){
+                    case 0:{
+                        for(int i = 0; i < num_born_bounds * 2; i += 2){
+                            int lb = rules[current_rule].born_bounds[i];
+                            int up = rules[current_rule].born_bounds[i + 1];
+                            if(nn >= lb && nn <= up){
+                                IncrementCell(x, y, z);
+                                break;
+                            }
+                        }
+                        break;
                     }
-                    update_grid[x][y][z] = 0;
+                    case 1:{
+                        SDL_bool survives = SDL_FALSE;
+                        for(int i = 0; i < num_survive_bounds * 2; i += 2){
+                            int lb = rules[current_rule].survive_bounds[i];
+                            int up = rules[current_rule].survive_bounds[i + 1];
+                            if(nn >= lb && nn <= up){
+                                survives = SDL_TRUE;
+                                break;
+                            }
+                        }
+                        if(!survives) IncrementCell(x, y, z);
+                        break;
+                    }
+                    default:
+                        IncrementCell(x, y, z);
+                        break;
+                }
+            }
+        }
+    }
+
+    update_counter ++;
+}
+
+void SwitchRule(int next_rule_index){
+    current_rule = next_rule_index;
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            for(int z = 0; z < Z_CELLS; z ++){
+                if(main_grid[x][y][z] >= rules[current_rule].num_states){
+                    main_grid[x][y][z] = rules[current_rule].num_states - 1;
                 }
             }
         }
@@ -552,13 +747,10 @@ void FREE(){
     for(int x = 0; x < X_CELLS; x ++){
         for(int y = 0; y < Y_CELLS; y ++){
             free(main_grid[x][y]);
-            free(update_grid[x][y]);
         }
         free(main_grid[x]);
-        free(update_grid[x]);
     }
     free(main_grid);
-    free(update_grid);
 
     DeleteShaders();
     SDL_GL_DeleteContext(ctx);
