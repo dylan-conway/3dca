@@ -8,7 +8,7 @@
             "name": "Debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}\\441final.exe",
+            "program": "${workspaceFolder}\\final.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

@@ -45,6 +45,14 @@ void Camera_RotateAroundOrigin(double step){
     Camera_SetPosition(new_cam_pos);
 }
 
+void Camera_RotateAroundOriginY(double step){
+
+    // vec3 new_cam_pos;
+    // Camera_GetPosition(new_cam_pos);
+
+    // double radius = sqrt(pow)
+}
+
 void Camera_GetViewMatrix(mat4 out_view_matrix){
     glm_lookat(
         _cam.position,
@@ -74,4 +82,8 @@ void Camera_GetMVP(mat4* model, mat4 out_mvp){
         (mat4 *[]){&projection_matrix, &view_matrix, model},
         3, out_mvp
     );
+}
+
+void Camera_UpdateUniform(){
+    UpdateCameraUniform(_cam.position);
 }

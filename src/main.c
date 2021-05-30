@@ -8,6 +8,7 @@
 #include <cglm/vec2.h>
 #include <cglm/affine.h>
 #include <cglm/version.h>
+#include <cglm/quat.h>
 
 #include "shaders.h"
 #include "meshes.h"
@@ -34,9 +35,14 @@ int INIT();
 void DRAW();
 void FREE();
 
+void RaycastAtMouse(vec3 out_ray);
+SDL_bool RaycastHit(vec3 ray, vec3 ray_origin, vec3 object_center, float radius);
+
 double GetDeltaTime(Uint64 start_time, Uint64 end_time);
 
 SDL_bool CheckCell(int*** grid, int x, int y, int z);
+void ClearGrid(int*** grid);
+void RandomizeGrid(int*** grid);
 int CountNeighbors(int x, int y, int z);
 void UpdateCells();
 
@@ -63,14 +69,6 @@ int main(int argc, char** argv){
         }
     }
 
-    for(int x = 0; x < X_CELLS; x ++){
-        for(int y = 0; y < Y_CELLS; y ++){
-            for(int z = 0; z < Z_CELLS; z ++){
-                main_grid[x][y][z] = rand() % 2;
-            }
-        }
-    }
-
     update_grid = malloc(sizeof(int**) * X_CELLS);
     for(int i = 0; i < X_CELLS; i ++){
         update_grid[i] = malloc(sizeof(int*) * Y_CELLS);
@@ -79,13 +77,8 @@ int main(int argc, char** argv){
         }
     }
 
-    for(int x = 0; x < X_CELLS; x ++){
-        for(int y = 0; y < Y_CELLS; y ++){
-            for(int z = 0; z < Z_CELLS; z ++){
-                update_grid[x][y][z] = 0;
-            }
-        }
-    }
+    RandomizeGrid(main_grid);
+    ClearGrid(update_grid);
 
     Uint64 grid_last_update_time = SDL_GetPerformanceCounter();
     SDL_Event event;
@@ -142,6 +135,13 @@ int main(int argc, char** argv){
             }
         }
 
+        if(KeyClicked(SDLK_c)){
+            ClearGrid(main_grid);
+        }
+
+        if(KeyClicked(SDLK_r)){
+            RandomizeGrid(main_grid);
+        }
 
 
         Sint32 wheel_move;
@@ -157,9 +157,6 @@ int main(int argc, char** argv){
 
         if(ButtonDown(SDL_BUTTON_MIDDLE)){
 
-            vec3 cam_position;
-            Camera_GetPosition(cam_position);
-
             vec2 curr_mouse_pos, prev_mouse_pos;
             Mouse_GetCurrPos(curr_mouse_pos);
             Mouse_GetPrevPos(prev_mouse_pos);
@@ -169,93 +166,82 @@ int main(int argc, char** argv){
                 double rotation_step = mouse_diff_x  * 0.004f;
                 Camera_RotateAroundOrigin(rotation_step);
             }
+
+            float mouse_diff_y = curr_mouse_pos[1] - prev_mouse_pos[1];
+            if(mouse_diff_y != 0){
+                double rotation_step = mouse_diff_y * 0.004f;
+                Camera_RotateAroundOriginY(rotation_step);
+            }
         }
 
-        // Update uniforms with new camera position
-        vec3 cam_position;
-        Camera_GetPosition(cam_position);
-        UpdateCameraUniform(cam_position);
-        vec3 light_direction;
-        glm_vec3_sub((vec3){0.0f, 0.0f, 0.0f}, cam_position, light_direction);
-        glm_vec3_normalize(light_direction);
-        UpdateLightDirectionUniform(light_direction);
-
+        // Delete cubes
         if(ButtonDown(SDL_BUTTON_RIGHT)){
-            
-            // Make a ray from mouse coordinates. Origin of ray is camera position
-            // https://antongerdelan.net/opengl/raycasting.html
 
-            vec2 mouse_coords;
-            Mouse_GetCurrPos(mouse_coords);
-
-            float x = (2.0f * mouse_coords[0]) / WINDOW_W - 1.0f;
-            float y = 1.0f - (2.0f * mouse_coords[1]) / WINDOW_H;
-            float z = 1.0f;
-
-            vec3 ray_nds = {x, y, z};
-
-            vec4 ray_clip = {
-                ray_nds[0],
-                ray_nds[1],
-                -1.0f, 1.0f
-            };
-
-            mat4 proj_matrix, inv_proj_matrix;
-            Camera_GetProjectionMatrix(proj_matrix);
-            glm_mat4_inv(proj_matrix, inv_proj_matrix);
-
-            vec4 ray_eye;
-            glm_mat4_mulv(inv_proj_matrix, ray_clip, ray_eye);
-            ray_eye[2] = -1.0f;
-            ray_eye[3] = 0.0f;
-
-            vec4 ray_world_temp;
-            mat4 view_matrix, inv_view_matrix;
-            Camera_GetViewMatrix(view_matrix);
-            glm_mat4_inv(view_matrix, inv_view_matrix);
-            glm_mat4_mulv(inv_view_matrix, ray_eye, ray_world_temp);
-
-            vec3 ray_world, ray_origin;
-            glm_vec3(ray_world_temp, ray_world);
-            glm_vec3_normalize(ray_world);
-            float ray_world_length = glm_vec3_norm(ray_world);
+            // Get the ray from mouse
+            vec3 ray, ray_origin;
+            RaycastAtMouse(ray);
             Camera_GetPosition(ray_origin);
 
-            float cube_delete_radius = 2.0f;
+            float cube_delete_radius = 2.5f;
 
             for(int x = 0; x < X_CELLS; x ++){
                 for(int y = 0; y < Y_CELLS; y ++){
                     for(int z = 0; z < Z_CELLS; z ++){
 
-                        // Determine if a ray collides with obects in a scene
-                        // https://stackoverflow.com/questions/34251763/ray-sphere-intersections-in-opengl
+                        vec3 cube_center = {
+                            (x - X_CELLS / 2) * 1.0f,
+                            (y - Y_CELLS / 2) * 1.0f,
+                            (z - Z_CELLS / 2) * 1.0f
+                        };
                         
+                        // If the ray intersects with any cube (determined with a bounding sphere
+                        // around the cube), then delete the cube
+                        if(RaycastHit(ray, ray_origin, cube_center, cube_delete_radius)){
+                            main_grid[x][y][z] = 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add cells
+        if(ButtonDown(SDL_BUTTON_LEFT)){
+
+            // Same as deletion, raycast from the mouse and check for collisions
+
+            vec3 ray, ray_origin;
+            RaycastAtMouse(ray);
+            Camera_GetPosition(ray_origin);
+
+            float cube_creation_radius = 1.1f;
+
+            for(int x = 0; x < X_CELLS; x ++){
+                for(int y = 0; y < Y_CELLS; y ++){
+                    for(int z = 0; z < Z_CELLS; z ++){
+
                         vec3 cube_center = {
                             (x - X_CELLS / 2) * 1.0f,
                             (y - Y_CELLS / 2) * 1.0f,
                             (z - Z_CELLS / 2) * 1.0f
                         };
 
-                        vec3 center_minus_origin;
-                        glm_vec3_sub(cube_center, ray_origin, center_minus_origin);
-
-                        vec3 cross_dir_and_center_minus_origin;
-                        glm_vec3_cross(ray_world, center_minus_origin, cross_dir_and_center_minus_origin);
-
-                        float cross_dir_and_center_minus_origin_norm = glm_vec3_norm(
-                            cross_dir_and_center_minus_origin
-                        );
-
-                        if(cross_dir_and_center_minus_origin_norm / ray_world_length < cube_delete_radius){
-                            main_grid[x][y][z] = 0;
+                        if(RaycastHit(ray, ray_origin, cube_center, cube_creation_radius)){
+                            main_grid[x][y][z] = 1;
                         }
-
-                        
                     }
                 }
             }
-            
         }
+
+        // Update uniforms with new camera position
+        Camera_UpdateUniform();
+        vec3 cam_position;
+        Camera_GetPosition(cam_position);
+
+        vec3 light_direction;
+        glm_vec3_sub((vec3){0.0f, 0.0f, 0.0f}, cam_position, light_direction);
+        glm_vec3_normalize(light_direction);
+        UpdateLightDirectionUniform(light_direction);
 
         switch(state){
 
@@ -291,10 +277,75 @@ int main(int argc, char** argv){
     return 0;
 }
 
+SDL_bool RaycastHit(vec3 ray, vec3 ray_origin, vec3 object_center, float radius){
+
+    // Determine if a ray collides with obects in a scene
+    // https://stackoverflow.com/questions/34251763/ray-sphere-intersections-in-opengl
+    // Using equation: length(cross(direction, center - origin)) / length(direction) < radius
+
+    SDL_bool hit = SDL_FALSE;
+
+    vec3 center_minus_origin;
+    glm_vec3_sub(object_center, ray_origin, center_minus_origin);
+
+    vec3 cross_dir_and_center_minus_origin;
+    glm_vec3_cross(ray, center_minus_origin, cross_dir_and_center_minus_origin);
+
+    float cross_dir_and_center_minus_origin_norm = glm_vec3_norm(
+        cross_dir_and_center_minus_origin
+    );
+
+    float ray_norm = glm_vec3_norm(ray);
+    if(cross_dir_and_center_minus_origin_norm / ray_norm < radius){
+        hit = SDL_TRUE;
+    }
+
+    return hit;
+}
+
+void RaycastAtMouse(vec3 out_ray){
+
+    // Make a ray from mouse coordinates. Origin of ray is camera position
+    // https://antongerdelan.net/opengl/raycasting.html
+
+    vec2 mouse_coords;
+    Mouse_GetCurrPos(mouse_coords);
+
+    float x = (2.0f * mouse_coords[0]) / WINDOW_W - 1.0f;
+    float y = 1.0f - (2.0f * mouse_coords[1]) / WINDOW_H;
+    float z = 1.0f;
+
+    vec3 ray_nds = {x, y, z};
+
+    vec4 ray_clip = {
+        ray_nds[0],
+        ray_nds[1],
+        -1.0f, 1.0f
+    };
+
+    mat4 proj_matrix, inv_proj_matrix;
+    Camera_GetProjectionMatrix(proj_matrix);
+    glm_mat4_inv(proj_matrix, inv_proj_matrix);
+
+    vec4 ray_eye;
+    glm_mat4_mulv(inv_proj_matrix, ray_clip, ray_eye);
+    ray_eye[2] = -1.0f;
+    ray_eye[3] = 0.0f;
+
+    vec4 ray_world;
+    mat4 view_matrix, inv_view_matrix;
+    Camera_GetViewMatrix(view_matrix);
+    glm_mat4_inv(view_matrix, inv_view_matrix);
+    glm_mat4_mulv(inv_view_matrix, ray_eye, ray_world);
+
+    glm_vec3(ray_world, out_ray);
+    glm_normalize(out_ray);
+}
+
 void DRAW(){
 
     // Clear window
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
@@ -305,9 +356,9 @@ void DRAW(){
                 if(main_grid[x][y][z]){
 
                     // Assign colors from xyz coordinate
-                    float r = (x * 3 + 130) / 255.0f;
+                    float r = (x * 3.0f + 130) / 255.0f;
                     float g = (y * 1.2f + 100) / 255.0f;
-                    float b = (z * 3.5 + 100) / 255.0f;
+                    float b = (z * 3.5f + 100) / 255.0f;
                     UpdateColorUniform((vec4){r, g, b, 1.0f});
                     vec3 dst_vec = {
                         (x - X_CELLS / 2) * 1.0f,
@@ -354,6 +405,26 @@ SDL_bool CheckCell(int*** grid, int x, int y, int z){
         return SDL_FALSE;
     }
     return (SDL_bool)grid[x][y][z];
+}
+
+void ClearGrid(int*** grid){
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            for(int z = 0; z < Z_CELLS; z ++){
+                grid[x][y][z] = 0;
+            }
+        }
+    }
+}
+
+void RandomizeGrid(int*** grid){
+    for(int x = 0; x < X_CELLS; x ++){
+        for(int y = 0; y < Y_CELLS; y ++){
+            for(int z = 0; z < Z_CELLS; z ++){
+                grid[x][y][z] = rand() % 2;
+            }
+        }
+    }
 }
 
 void UpdateCells(){
