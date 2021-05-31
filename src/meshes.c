@@ -162,7 +162,7 @@ void DrawCube(struct Cube* cube){
     glDrawArrays(GL_TRIANGLES, 0, 12 * 3); // Two triangles per side
 }
 
-void DrawStaticCube(vec3 position){
+void DrawStaticCube(vec3 position, vec3 scale){
 
     mat4 mvp = GLM_MAT4_IDENTITY_INIT;
     mat4 mt = GLM_MAT4_IDENTITY_INIT;
@@ -170,7 +170,7 @@ void DrawStaticCube(vec3 position){
     mat4 model = GLM_MAT4_IDENTITY_INIT;
 
     glm_translate(mt, position);
-    glm_scale(ms, (vec3){0.5f, 0.5f, 0.5f});
+    glm_scale(ms, scale);
 
     glm_mat4_mul(mt, ms, model);
 

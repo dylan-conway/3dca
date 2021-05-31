@@ -55,6 +55,9 @@ const char *GetFragmentShader()
            "  for(int i = 0; i < 3; i ++){\n"
            "    frag_color[i] = frag_color[i] * shading > 1 ? 1 : frag_color[i] * shading;\n"
            "  }\n"
+           "  if(color == vec4(1.0f, 1.0f, 1.0f, 1.0f)){\n"
+           "    frag_color = color;\n"
+           "  }\n"
            "}\n"
          );
    return fragment_shader;

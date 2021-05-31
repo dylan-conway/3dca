@@ -16,6 +16,18 @@
 #include "defines.h"
 #include "input.h"
 
+#define MAX_X_CELLS 80
+#define MAX_Y_CELLS 80
+#define MAX_Z_CELLS 80
+
+#define MIN_X_CELLS 10
+#define MIN_Y_CELLS 10
+#define MIN_Z_CELLS 10
+
+int X_CELLS = 40;
+int Y_CELLS = 40;
+int Z_CELLS = 40;
+
 enum STATE {
     EDITOR,
     SIMULATION
@@ -26,10 +38,10 @@ SDL_Window* window = NULL;
 SDL_bool running = SDL_TRUE;
 enum STATE state = EDITOR;
 
-SDL_bool wireframe = SDL_FALSE;
+Uint64 wireframe_cube_timer;
 
-int*** main_grid = NULL;
-double grid_update_interval = 0.5f;
+int main_grid[MAX_X_CELLS][MAX_Y_CELLS][MAX_Z_CELLS];
+double grid_update_interval = 0.55f;
 
 int update_counter = 1;
 
@@ -47,7 +59,6 @@ struct CA_rules {
 };
 
 #define NUM_RULES 5
-
 int current_rule = 0;
 
 struct CA_rules rules[NUM_RULES] = {
@@ -97,9 +108,10 @@ double GetDeltaTime(Uint64 start_time, Uint64 end_time);
 
 
 SDL_bool CheckCell(int x, int y, int z);
+void CheckCellStates();
 int GetCell(int x, int y, int z);
 void IncrementCell(int x, int y, int z);
-void ClearGrid(int*** grid);
+void ClearGrid();
 void FillGrid();
 void RandomizeGrid();
 int CountMooreNeighbors(int x, int y, int z);
@@ -167,17 +179,9 @@ int main(int argc, char** argv){
     }
     printf("\n");
 
-    main_grid = malloc(sizeof(int**) * X_CELLS);
-    for(int i = 0; i < X_CELLS; i ++){
-        main_grid[i] = malloc(sizeof(int*) * Y_CELLS);
-        for(int j = 0; j < Y_CELLS; j ++){
-            main_grid[i][j] = malloc(sizeof(int) * Z_CELLS);
-        }
-    }
-
-    ClearGrid(main_grid);
-
+    FillGrid();
     SwitchRule(current_rule);
+    wireframe_cube_timer = SDL_GetPerformanceCounter();
 
     Uint64 grid_last_update_time = SDL_GetPerformanceCounter();
     SDL_Event event;
@@ -224,16 +228,6 @@ int main(int argc, char** argv){
             continue;
         }
 
-        if(KeyClicked(SDLK_w)){
-            if(wireframe){
-                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                wireframe = SDL_FALSE;
-            } else {
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                wireframe = SDL_TRUE;
-            }
-        }
-
         if(KeyClicked(SDLK_c)){
             ClearGrid(main_grid);
         }
@@ -256,28 +250,48 @@ int main(int argc, char** argv){
 
         if(KeyClicked(SDLK_DOWN)){
             grid_update_interval += 0.1f;
-            if(grid_update_interval > 0.5f){
-                grid_update_interval = 0.5f;
+            if(grid_update_interval > 0.55f){
+                grid_update_interval = 0.55f;
             }
         }
 
         if(KeyClicked(SDLK_UP)){
             grid_update_interval -= 0.1f;
-            if(grid_update_interval < 0.1f){
-                grid_update_interval = 0.1f;
+            if(grid_update_interval < 0.05f){
+                grid_update_interval = 0.05f;
             }
+        }
+
+        if(KeyClicked(SDLK_1)){
+            ClearGrid();
+            main_grid[X_CELLS / 2][Y_CELLS / 2][Z_CELLS / 2] = 1;
         }
 
 
         Sint32 wheel_move;
         if(Mouse_WheelMoved(&wheel_move)){
 
-            // TODO: ZOOM
+            if(wheel_move < 0){
+                X_CELLS -= 2;
+                Y_CELLS -= 2;
+                Z_CELLS -= 2;
+            } else if(wheel_move > 0){
+                X_CELLS += 2;
+                Y_CELLS += 2;
+                Z_CELLS += 2;
+            }
 
-            // Sint32 wheel_move = Mouse_GetWheelMovement();
-            // double step = 10.0f;
-            // // camera_radius_from_origin += wheel_move * step * delta;
-            // Camera_MovePosition((vec3){0.0f, wheel_move, wheel_move});
+            if(X_CELLS < MIN_X_CELLS) X_CELLS = MIN_X_CELLS;
+            if(X_CELLS > MAX_X_CELLS) X_CELLS = MAX_X_CELLS;
+            if(Y_CELLS < MIN_Y_CELLS) Y_CELLS = MIN_Y_CELLS;
+            if(Y_CELLS > MAX_Y_CELLS) Y_CELLS = MAX_Y_CELLS;
+            if(Z_CELLS < MIN_Z_CELLS) Z_CELLS = MIN_Z_CELLS;
+            if(Z_CELLS > MAX_Z_CELLS) Z_CELLS = MAX_Z_CELLS;
+
+            wireframe_cube_timer = SDL_GetPerformanceCounter();
+
+            // Make sure cell states do not go past current rule
+            CheckCellStates();
         }
 
         if(ButtonDown(SDL_BUTTON_MIDDLE)){
@@ -480,15 +494,33 @@ void DRAW(){
                     float b = (z * 3.5f + 100) / 255.0f;
                     UpdateColorUniform((vec4){r, g, b, 1.0f});
                     vec3 dst_vec = {
-                        (x - X_CELLS / 2) * 1.0f,
-                        (y - Y_CELLS / 2) * 1.0f,
-                        (z - Z_CELLS / 2) * 1.0f
+                        ((float)x - X_CELLS / 2.0f) * 1.0f,
+                        ((float)y - Y_CELLS / 2.0f) * 1.0f,
+                        ((float)z - Z_CELLS / 2.0f) * 1.0f
                     };
-                    DrawStaticCube(dst_vec);
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                    DrawStaticCube(dst_vec, (vec3){0.5f, 0.5f, 0.5f});
                 }
             }
         }
     }
+
+    // Draw big cube
+    if(GetDeltaTime(wireframe_cube_timer, SDL_GetPerformanceCounter()) < 1.0f){
+        UpdateColorUniform((vec4){1.0f, 1.0f, 1.0f, 1.0f});
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        vec3 dst_vec = {
+            -0.55f, -0.55f, -0.55f
+        };
+        vec3 scale_vec = {
+            X_CELLS / 2.0f * 1.03f,
+            Y_CELLS / 2.0f * 1.03f,
+            Z_CELLS / 2.0f * 1.03f
+        };
+        DrawStaticCube(dst_vec, scale_vec);
+    }
+
+    
 
     // Swap buffers
     SDL_GL_SwapWindow(window);
@@ -516,37 +548,41 @@ int CountMooreNeighbors(int x, int y, int z){
                 if(GetCell(new_x, new_y, new_z) == 1){
                     count ++;
                 }
-                // if(CheckCell(x + i, y + j, z + k)){
-                //     if(GetCell(x + i, y + j, z + k) == 1){
-                //         count ++;
-                //     }
-                // }
             }
         }
     }
     return count;
 }
 
-int CountNeumannNeighbors(int x, int y, int z){
-    int count = 0;
-    for(int i = -1; i < 2; i ++){
-        for(int j = -1; j < 2; j ++){
-            for(int k = -1; k < 2; k ++){
-                if(i == 0 && j == 0 && k == 0) continue;
-                SDL_bool n = SDL_FALSE;
-                if(i == 0 && j == 0) n = SDL_TRUE;
-                if(i == 0 && k == 0) n = SDL_TRUE;
-                if(j == 0 && k == 0) n = SDL_TRUE;
-                if(n && CheckCell(x + i, y + j, z + k)){
-                    if(GetCell(x + i, y + j, z + k) == 1){
-                        count ++;
-                    }
-                }
-            }
-        }
-    }
-    return count;
-}
+// int CountNeumannNeighbors(int x, int y, int z){
+//     int count = 0;
+//     for(int i = -1; i < 2; i ++){
+//         for(int j = -1; j < 2; j ++){
+//             for(int k = -1; k < 2; k ++){
+//                 if(i == 0 && j == 0 && k == 0) continue;
+//                 SDL_bool n = SDL_FALSE;
+//                 if(i == 0 && j == 0) n = SDL_TRUE;
+//                 if(i == 0 && k == 0) n = SDL_TRUE;
+//                 if(j == 0 && k == 0) n = SDL_TRUE;
+//                 if(n){
+//                     int new_x = x + i;
+//                     int new_y = y + j;
+//                     int new_z = z + k;
+//                     if(new_x == -1) new_x = X_CELLS - 1;
+//                     if(new_x == X_CELLS) new_x = 1;
+//                     if(new_y == -1) new_y = Y_CELLS - 1;
+//                     if(new_y == Y_CELLS) new_y = 1;
+//                     if(new_z == -1) new_z = Z_CELLS - 1;
+//                     if(new_z == Z_CELLS) new_z = 1;
+//                     if(GetCell(new_x, new_y, new_z) == 1){
+//                         count ++;
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//     return count;
+// }
 
 SDL_bool CheckCell(int x, int y, int z){
     if(x < 0 || x >= X_CELLS){
@@ -573,11 +609,11 @@ void IncrementCell(int x, int y, int z){
     }
 }
 
-void ClearGrid(int*** grid){
+void ClearGrid(){
     for(int x = 0; x < X_CELLS; x ++){
         for(int y = 0; y < Y_CELLS; y ++){
             for(int z = 0; z < Z_CELLS; z ++){
-                grid[x][y][z] = 0;
+                main_grid[x][y][z] = 0;
             }
         }
     }
@@ -609,24 +645,30 @@ void UpdateCells(){
     int num_born_bounds = rules[current_rule].num_born_bounds;
     char nbh = rules[current_rule].neighborhood;
 
+    // Count neighbors.
     int num_neighbors[X_CELLS][Y_CELLS][Z_CELLS];
     for(int x = 0; x < X_CELLS; x ++){
         for(int y = 0; y < Y_CELLS; y ++){
             for(int z = 0; z < Z_CELLS; z ++){
                 if(nbh == 'M'){
                     num_neighbors[x][y][z] = CountMooreNeighbors(x, y, z);
-                } else if(nbh == 'N'){
-                    num_neighbors[x][y][z] = CountNeumannNeighbors(x, y, z);
                 }
+                // } else if(nbh == 'N'){
+                //     num_neighbors[x][y][z] = CountNeumannNeighbors(x, y, z);
+                // }
             }
         }
     }
 
+    // Apply CA rules to grid
     for(int x = 0; x < X_CELLS; x ++){
         for(int y = 0; y < Y_CELLS; y ++){
             for(int z = 0; z < Z_CELLS; z ++){
 
                 int nn = num_neighbors[x][y][z];
+                if(nn < 0 || nn > 26){
+                    printf("PROBLEM\n");
+                }
                 int cell = GetCell(x, y, z);
 
                 switch(cell){
@@ -651,7 +693,9 @@ void UpdateCells(){
                                 break;
                             }
                         }
-                        if(!survives) IncrementCell(x, y, z);
+                        if(!survives){
+                            IncrementCell(x, y, z);
+                        }
                         break;
                     }
                     default:
@@ -667,6 +711,10 @@ void UpdateCells(){
 
 void SwitchRule(int next_rule_index){
     current_rule = next_rule_index;
+    CheckCellStates();
+}
+
+void CheckCellStates(){
     for(int x = 0; x < X_CELLS; x ++){
         for(int y = 0; y < Y_CELLS; y ++){
             for(int z = 0; z < Z_CELLS; z ++){
@@ -717,7 +765,7 @@ int INIT(){
         printf("SDL GL CREATE CONTEXT FAILED\n");
         return -1;
     }
-    SDL_GL_SetSwapInterval(0);
+    SDL_GL_SetSwapInterval(1);
     glViewport(0, 0, WINDOW_W, WINDOW_H);
 
     // Initialize glew
@@ -750,14 +798,6 @@ int INIT(){
 }
 
 void FREE(){
-
-    for(int x = 0; x < X_CELLS; x ++){
-        for(int y = 0; y < Y_CELLS; y ++){
-            free(main_grid[x][y]);
-        }
-        free(main_grid[x]);
-    }
-    free(main_grid);
 
     DeleteShaders();
     SDL_GL_DeleteContext(ctx);

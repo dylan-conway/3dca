@@ -25,7 +25,7 @@ struct Cube InitCube(vec3 position);
 void SetPositionCube(struct Cube* cube, vec3 new_position);
 void SetScaleCube(struct Cube* cube, vec3 new_scale);
 void DrawCube(struct Cube* cube);
-void DrawStaticCube(vec3 position);
+void DrawStaticCube(vec3 position, vec3 scale);
 
 
 #endif
