@@ -72,7 +72,7 @@ void Camera_GetProjectionMatrix(mat4 out_proj_matrix){
 }
 
 void Camera_GetMVP(mat4* model, mat4 out_mvp){
-    mat4 projection_matrix;
+    mat4 projection_matrix = GLM_MAT4_ZERO_INIT;
     Camera_GetProjectionMatrix(projection_matrix);
 
     mat4 view_matrix = GLM_MAT4_ZERO_INIT;

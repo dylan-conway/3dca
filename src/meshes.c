@@ -168,13 +168,18 @@ void DrawStaticCube(vec3 position, vec3 scale){
     mat4 mt = GLM_MAT4_IDENTITY_INIT;
     mat4 ms = GLM_MAT4_IDENTITY_INIT;
     mat4 model = GLM_MAT4_IDENTITY_INIT;
+    mat4 view = GLM_MAT4_ZERO_INIT;
+    mat4 projection = GLM_MAT4_ZERO_INIT;
 
     glm_translate(mt, position);
     glm_scale(ms, scale);
 
     glm_mat4_mul(mt, ms, model);
+    Camera_GetViewMatrix(view);
+    Camera_GetProjectionMatrix(projection);
 
-    Camera_GetMVP(&model, mvp);
+    glm_mat4_mulN((mat4 *[]){&projection, &view, &model}, 3, mvp);
+
     UpdateMVPUniform(mvp);
 
     glBindVertexArray(_cube_vao);

@@ -58,10 +58,19 @@ struct CA_rules {
     char neighborhood;
 };
 
-#define NUM_RULES 5
+#define NUM_RULES 8
 int current_rule = 0;
 
 struct CA_rules rules[NUM_RULES] = {
+    {
+        "Coral", 1, NULL, 3, NULL, 4, 'M'
+    },
+    {
+        "Pyroclastic", 1, NULL, 1, NULL, 10, 'M'
+    },
+    {
+        "Slow Decay 1", 1, NULL, 1, NULL, 3, 'M'
+    },
     {
         "Builder 2", 1, NULL, 1, NULL, 2, 'M'
     },
@@ -81,6 +90,9 @@ struct CA_rules rules[NUM_RULES] = {
 
 int survive_bounds_counter = 0;
 int survive_bounds[] = {
+    5, 8,
+    4, 7,
+    13, 26,
     5, 7,
     13, 26,
     3, 3,
@@ -90,6 +102,9 @@ int survive_bounds[] = {
 
 int born_bounds_counter = 0;
 int born_bounds[] = {
+    6, 7, 9, 9, 12, 12,
+    6, 8,
+    10, 26,
     1, 1,
     13, 14, 17, 19,
     1, 3,
@@ -191,7 +206,6 @@ int main(int argc, char** argv){
 
         curr_frame_time = SDL_GetPerformanceCounter();
         double delta = GetDeltaTime(prev_frame_time, curr_frame_time);
-        delta ++;
 
         // Process user input
         UpdateInput();
@@ -267,6 +281,28 @@ int main(int argc, char** argv){
             main_grid[X_CELLS / 2][Y_CELLS / 2][Z_CELLS / 2] = 1;
         }
 
+        if(KeyClicked(SDLK_2)){
+            ClearGrid();
+            for(int x = -2; x < 2; x ++){
+                for(int y = -2; y < 2; y ++){
+                    for(int z = -2; z < 2; z ++){
+                        main_grid[X_CELLS / 2 + x][Y_CELLS / 2 + y][Z_CELLS / 2 + z] = 1;
+                    }
+                }
+            }
+        }
+
+        if(KeyClicked(SDLK_3)){
+            ClearGrid();
+            for(int x = -4; x < 4; x ++){
+                for(int y = -4; y < 4; y ++){
+                    for(int z = -4; z < 4; z ++){
+                        main_grid[X_CELLS / 2 + x][Y_CELLS / 2 + y][Z_CELLS / 2 + z] = 1;
+                    }
+                }
+            }
+        }
+
 
         Sint32 wheel_move;
         if(Mouse_WheelMoved(&wheel_move)){
@@ -305,6 +341,16 @@ int main(int argc, char** argv){
                 double rotation_step = mouse_diff_x / 3 * 0.01f;
                 Camera_RotateAroundOrigin(rotation_step);
             }
+        }
+
+        if(KeyDown(SDLK_RIGHT)){
+            double rotation_step = 1.0f * delta;
+            Camera_RotateAroundOrigin(rotation_step);
+        }
+
+        if(KeyDown(SDLK_LEFT)){
+            double rotation_step = -1.0f * delta;
+            Camera_RotateAroundOrigin(rotation_step);
         }
 
         // Delete cubes
@@ -489,9 +535,9 @@ void DRAW(){
                 if(main_grid[x][y][z]){
 
                     // Assign colors from xyz coordinate (RGB cube)
-                    float r = (x * 3.0f + 130) / 255.0f;
-                    float g = (y * 1.2f + 100) / 255.0f;
-                    float b = (z * 3.5f + 100) / 255.0f;
+                    float r = (x * 3.0f + (150 - X_CELLS)) / 255.0f;
+                    float g = (y * 1.2f + (170 - Y_CELLS)) / 255.0f;
+                    float b = (z * 3.5f + (150 - Z_CELLS)) / 255.0f;
                     UpdateColorUniform((vec4){r, g, b, 1.0f});
                     vec3 dst_vec = {
                         ((float)x - X_CELLS / 2.0f) * 1.0f,
@@ -711,6 +757,7 @@ void UpdateCells(){
 
 void SwitchRule(int next_rule_index){
     current_rule = next_rule_index;
+    SDL_SetWindowTitle(window, rules[current_rule].name);
     CheckCellStates();
 }
 
@@ -765,7 +812,7 @@ int INIT(){
         printf("SDL GL CREATE CONTEXT FAILED\n");
         return -1;
     }
-    SDL_GL_SetSwapInterval(1);
+    SDL_GL_SetSwapInterval(0);
     glViewport(0, 0, WINDOW_W, WINDOW_H);
 
     // Initialize glew
