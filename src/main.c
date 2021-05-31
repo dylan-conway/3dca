@@ -46,9 +46,9 @@ struct CA_rules {
     char neighborhood;
 };
 
-#define NUM_RULES 6
+#define NUM_RULES 5
 
-int current_rule = 5;
+int current_rule = 0;
 
 struct CA_rules rules[NUM_RULES] = {
     {
@@ -56,9 +56,6 @@ struct CA_rules rules[NUM_RULES] = {
     },
     {
         "Clouds 1", 1, NULL, 2, NULL, 2, 'M'
-    },
-    {
-        "Crystal Growth 1", 1, NULL, 2, NULL, 5, 'N'
     },
     {
         "Pulse Waves", 1, NULL, 1, NULL, 10, 'M'
@@ -75,7 +72,6 @@ int survive_bounds_counter = 0;
 int survive_bounds[] = {
     5, 7,
     13, 26,
-    1, 2,
     3, 3,
     1, 1, 4, 4, 8, 8, 11, 11, 13, 26,
     6, 8
@@ -85,7 +81,6 @@ int born_bounds_counter = 0;
 int born_bounds[] = {
     1, 1,
     13, 14, 17, 19,
-    1, 1, 3, 3,
     1, 3,
     13, 26,
     6, 8
@@ -125,7 +120,7 @@ int main(int argc, char** argv){
     InitInput();
     InitCubeVAO();
     Camera_Init();
-    Camera_SetPosition((vec3){0.0f, 25.0f * 1.3f, 70.0f * 1.3f});
+    Camera_SetPosition((vec3){0.0f, 25.0f * 2.3f, 70.0f * 2.3f});
 
     for(int i = 0; i < NUM_RULES; i ++){
         rules[i].survive_bounds = malloc(sizeof(int) * rules[i].num_survive_bounds * 2);
@@ -251,7 +246,7 @@ int main(int argc, char** argv){
             FillGrid();
         }
 
-        if(KeyDown(SDLK_s)){
+        if(KeyClicked(SDLK_s)){
             int next_rule = current_rule + 1;
             if(next_rule >= NUM_RULES){
                 next_rule = 0;
@@ -509,11 +504,23 @@ int CountMooreNeighbors(int x, int y, int z){
         for(int j = -1; j < 2; j ++){
             for(int k = -1; k < 2; k ++){
                 if(i == 0 && j == 0 && k == 0) continue;
-                if(CheckCell(x + i, y + j, z + k)){
-                    if(GetCell(x + i, y + j, z + k) == 1){
-                        count ++;
-                    }
+                int new_x = x + i;
+                int new_y = y + j;
+                int new_z = z + k;
+                if(new_x == -1) new_x = X_CELLS - 1;
+                if(new_x == X_CELLS) new_x = 1;
+                if(new_y == -1) new_y = Y_CELLS - 1;
+                if(new_y == Y_CELLS) new_y = 1;
+                if(new_z == -1) new_z = Z_CELLS - 1;
+                if(new_z == Z_CELLS) new_z = 1;
+                if(GetCell(new_x, new_y, new_z) == 1){
+                    count ++;
                 }
+                // if(CheckCell(x + i, y + j, z + k)){
+                //     if(GetCell(x + i, y + j, z + k) == 1){
+                //         count ++;
+                //     }
+                // }
             }
         }
     }
