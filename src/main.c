@@ -3,18 +3,24 @@
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
+#define DEBUG
+#define CGLM_DEFINE_PRINTS
 #include <cglm/mat4.h>
 #include <cglm/vec3.h>
 #include <cglm/vec2.h>
 #include <cglm/affine.h>
 #include <cglm/version.h>
 #include <cglm/quat.h>
+#include <cglm/io.h>
 
 #include "shaders.h"
 #include "meshes.h"
 #include "camera.h"
 #include "defines.h"
 #include "input.h"
+#include "ui.h"
+
+
 
 #define MAX_X_CELLS 80
 #define MAX_Y_CELLS 80
@@ -58,18 +64,12 @@ struct CA_rules {
     char neighborhood;
 };
 
-#define NUM_RULES 8
+#define NUM_RULES 4
 int current_rule = 0;
 
 struct CA_rules rules[NUM_RULES] = {
     {
-        "Coral", 1, NULL, 3, NULL, 4, 'M'
-    },
-    {
         "Pyroclastic", 1, NULL, 1, NULL, 10, 'M'
-    },
-    {
-        "Slow Decay 1", 1, NULL, 1, NULL, 3, 'M'
     },
     {
         "Builder 2", 1, NULL, 1, NULL, 2, 'M'
@@ -79,37 +79,23 @@ struct CA_rules rules[NUM_RULES] = {
     },
     {
         "Pulse Waves", 1, NULL, 1, NULL, 10, 'M'
-    },
-    {
-        "Slow Decay 2", 5, NULL, 1, NULL, 5, 'M'
-    },
-    {
-        "No name", 1, NULL, 1, NULL, 3, 'M'
     }
 };
 
 int survive_bounds_counter = 0;
 int survive_bounds[] = {
-    5, 8,
     4, 7,
-    13, 26,
     5, 7,
     13, 26,
-    3, 3,
-    1, 1, 4, 4, 8, 8, 11, 11, 13, 26,
-    6, 8
+    3, 3
 };
 
 int born_bounds_counter = 0;
 int born_bounds[] = {
-    6, 7, 9, 9, 12, 12,
     6, 8,
-    10, 26,
     1, 1,
     13, 14, 17, 19,
-    1, 3,
-    13, 26,
-    6, 8
+    1, 3
 };
 
 int INIT();
@@ -193,6 +179,8 @@ int main(int argc, char** argv){
         printf("/%d/%c\n", rules[i].num_states, rules[i].neighborhood);
     }
     printf("\n");
+
+    // glm_rotate
 
     FillGrid();
     SwitchRule(current_rule);
@@ -344,12 +332,12 @@ int main(int argc, char** argv){
         }
 
         if(KeyDown(SDLK_RIGHT)){
-            double rotation_step = 1.0f * delta;
+            double rotation_step = 0.8f * delta;
             Camera_RotateAroundOrigin(rotation_step);
         }
 
         if(KeyDown(SDLK_LEFT)){
-            double rotation_step = -1.0f * delta;
+            double rotation_step = -0.8f * delta;
             Camera_RotateAroundOrigin(rotation_step);
         }
 
@@ -556,17 +544,17 @@ void DRAW(){
         UpdateColorUniform((vec4){1.0f, 1.0f, 1.0f, 1.0f});
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         vec3 dst_vec = {
-            -0.55f, -0.55f, -0.55f
+            -0.51f, -0.51f, -0.51f
         };
         vec3 scale_vec = {
-            X_CELLS / 2.0f * 1.03f,
-            Y_CELLS / 2.0f * 1.03f,
-            Z_CELLS / 2.0f * 1.03f
+            X_CELLS / 2.0f * 1.001f,
+            Y_CELLS / 2.0f * 1.001f,
+            Z_CELLS / 2.0f * 1.001f
         };
         DrawStaticCube(dst_vec, scale_vec);
     }
 
-    
+
 
     // Swap buffers
     SDL_GL_SwapWindow(window);
@@ -792,6 +780,8 @@ int INIT(){
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, 32);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
     
     // Make an sdl2 window for opengl
     Uint32 flags;
@@ -813,6 +803,7 @@ int INIT(){
         return -1;
     }
     SDL_GL_SetSwapInterval(0);
+    glEnable(GL_MULTISAMPLE);
     glViewport(0, 0, WINDOW_W, WINDOW_H);
 
     // Initialize glew

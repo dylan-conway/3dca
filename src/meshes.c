@@ -173,7 +173,6 @@ void DrawStaticCube(vec3 position, vec3 scale){
 
     glm_translate(mt, position);
     glm_scale(ms, scale);
-
     glm_mat4_mul(mt, ms, model);
     Camera_GetViewMatrix(view);
     Camera_GetProjectionMatrix(projection);
