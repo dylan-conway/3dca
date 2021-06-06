@@ -11,7 +11,7 @@ LLIBS = -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglew32 -lglu32 -lcglm
 CFLAGS += -Wall -std=c99 -Wno-missing-braces -Wfatal-errors -MD
 
 ifeq ($(BUILD_MODE),RELEASE)
-	CFLAGS += -s -O1 -Wl,-subsystem,windows
+	CFLAGS += -s -O3 -Wl,-subsystem,windows
 else
 	CFLAGS += -g -O0
 endif
