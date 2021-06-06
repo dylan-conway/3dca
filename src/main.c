@@ -51,6 +51,15 @@ double grid_update_interval = 0.55f;
 
 int update_counter = 1;
 
+int num_color_schemes = 3;
+enum COLOR_SCHEME {
+    RGB_CUBE = 0,
+    STATE_SHADING,
+    GRAY_CUBES
+};
+
+enum COLOR_SCHEME current_color_scheme = RGB_CUBE;
+
 struct CA_rules {
     char* name;
 
@@ -62,28 +71,37 @@ struct CA_rules {
 
     int num_states;
     char neighborhood;
+    int edge_wrap;
 };
 
-#define NUM_RULES 4
+#define NUM_RULES 6
 int current_rule = 0;
 
 struct CA_rules rules[NUM_RULES] = {
     {
-        "Pyroclastic", 1, NULL, 1, NULL, 10, 'M'
+        "test1", 2, NULL, 2, NULL, 4, 'M', 0
     },
     {
-        "Builder 2", 1, NULL, 1, NULL, 2, 'M'
+        "Triangle", 1, NULL, 1, NULL, 5, 'M', 0
     },
     {
-        "Clouds 1", 1, NULL, 2, NULL, 2, 'M'
+        "Pyroclastic", 1, NULL, 1, NULL, 10, 'M', 0
     },
     {
-        "Pulse Waves", 1, NULL, 1, NULL, 10, 'M'
+        "Builder 2", 1, NULL, 1, NULL, 2, 'M', 0
+    },
+    {
+        "Clouds 1", 1, NULL, 2, NULL, 2, 'M', 1
+    },
+    {
+        "Pulse Waves", 1, NULL, 1, NULL, 10, 'M', 0
     }
 };
 
 int survive_bounds_counter = 0;
 int survive_bounds[] = {
+    1, 6, 18, 18,
+    2, 3,
     4, 7,
     5, 7,
     13, 26,
@@ -92,6 +110,8 @@ int survive_bounds[] = {
 
 int born_bounds_counter = 0;
 int born_bounds[] = {
+    10, 11, 14, 15,
+    4, 10,
     6, 8,
     1, 1,
     13, 14, 17, 19,
@@ -248,6 +268,24 @@ int main(int argc, char** argv){
                 next_rule = 0;
             }
             SwitchRule(next_rule);
+        }
+
+        if(KeyClicked(SDLK_a)){
+            int prev_rule = current_rule - 1;
+            if(prev_rule < 0){
+                prev_rule = NUM_RULES - 1;
+            }
+            SwitchRule(prev_rule);
+        }
+
+        if(KeyClicked(SDLK_x)){
+            // Increment color scheme
+            current_color_scheme = (current_color_scheme + 1) % num_color_schemes;
+        }
+
+        if(KeyClicked(SDLK_z)){
+            // Decrement color scheme
+            current_color_scheme = (current_color_scheme + num_color_schemes - 1) % num_color_schemes;
         }
 
         if(KeyClicked(SDLK_DOWN)){
@@ -515,6 +553,7 @@ void DRAW(){
     glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     // Draw elements
     for(int x = 0; x < X_CELLS; x ++){
@@ -522,17 +561,35 @@ void DRAW(){
             for(int z = 0; z < Z_CELLS; z ++){
                 if(main_grid[x][y][z]){
 
-                    // Assign colors from xyz coordinate (RGB cube)
-                    float r = (x * 3.0f + (150 - X_CELLS)) / 255.0f;
-                    float g = (y * 1.2f + (170 - Y_CELLS)) / 255.0f;
-                    float b = (z * 3.5f + (150 - Z_CELLS)) / 255.0f;
-                    UpdateColorUniform((vec4){r, g, b, 1.0f});
+                    switch(current_color_scheme){
+                        case RGB_CUBE:{
+                            // Assign colors from xyz coordinate (RGB cube)
+                            float r = (x * 3.0f + (150 - X_CELLS)) / 255.0f;
+                            float g = (y * 1.2f + (170 - Y_CELLS)) / 255.0f;
+                            float b = (z * 3.5f + (150 - Z_CELLS)) / 255.0f;
+                            UpdateColorUniform((vec4){r, g, b, 1.0f});
+                            break;
+                        }
+                        case STATE_SHADING:{
+                            if(main_grid[x][y][z] == 1){
+                                UpdateColorUniform(ORANGE);
+                            } else {
+                                UpdateColorUniform(RED);
+                            }
+                            break;
+                        }
+                        case GRAY_CUBES:{
+                            UpdateColorUniform(GRAY);
+                            break;
+                        }
+
+                    }
+                    
                     vec3 dst_vec = {
                         ((float)x - X_CELLS / 2.0f) * 1.0f,
                         ((float)y - Y_CELLS / 2.0f) * 1.0f,
                         ((float)z - Z_CELLS / 2.0f) * 1.0f
                     };
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
                     DrawStaticCube(dst_vec, (vec3){0.5f, 0.5f, 0.5f});
                 }
             }
@@ -573,14 +630,23 @@ int CountMooreNeighbors(int x, int y, int z){
                 int new_x = x + i;
                 int new_y = y + j;
                 int new_z = z + k;
-                if(new_x == -1) new_x = X_CELLS - 1;
-                if(new_x == X_CELLS) new_x = 1;
-                if(new_y == -1) new_y = Y_CELLS - 1;
-                if(new_y == Y_CELLS) new_y = 1;
-                if(new_z == -1) new_z = Z_CELLS - 1;
-                if(new_z == Z_CELLS) new_z = 1;
-                if(GetCell(new_x, new_y, new_z) == 1){
-                    count ++;
+                if(rules[current_rule].edge_wrap){
+                    // Clouds 1 looks better when edges wrap
+                    if(new_x == -1) new_x = X_CELLS - 1;
+                    if(new_x == X_CELLS) new_x = 1;
+                    if(new_y == -1) new_y = Y_CELLS - 1;
+                    if(new_y == Y_CELLS) new_y = 1;
+                    if(new_z == -1) new_z = Z_CELLS - 1;
+                    if(new_z == Z_CELLS) new_z = 1;
+                    if(GetCell(new_x, new_y, new_z) == 1){
+                        count ++;
+                    }
+                } else {
+                    if(CheckCell(new_x, new_y, new_z)){
+                       if(GetCell(new_x, new_y, new_z) == 1){
+                            count ++;
+                        }
+                    }
                 }
             }
         }
