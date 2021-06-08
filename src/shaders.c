@@ -14,59 +14,15 @@ void _print_shader_info_log(GLuint shader_index) {
     printf("shader info log for GL index %u:\n%s\n", shader_index, shader_log);
 }
 
-const char *GetVertexShader()
-{
-   static char vertex_shader[1024];
-   strcpy(vertex_shader, 
-           "#version 400\n"
-           "layout (location = 0) in vec3 vertex_position;\n"
-           "layout (location = 1) in vec3 vertex_normal;\n"
-           "uniform mat4 mvp;\n"
-           "uniform vec3 camera_pos;\n"
-           "uniform vec3 light_direction;\n"
-           "uniform vec4 lighting_coefficients;\n"
-           "out float shading;\n"
-           "void main() {\n"
-           "  gl_Position = mvp * vec4(vertex_position, 1.0);\n"
-           "  shading = lighting_coefficients[0];\n"
-           "  float ldotn = dot(light_direction, vertex_normal);\n"
-           "  shading += ldotn < 0 ? 0 : ldotn * lighting_coefficients[1];\n"
-
-        //    "  vec3 r = normalize(2 * ldotn * vertex_normal - light_direction);\n"
-        //    "  vec3 v = normalize(camera_pos - vertex_position);\n"
-        //    "  float rdotv = dot(r, v);\n"
-        //    "  float specular = rdotv > 0 ? pow(rdotv, lighting_coefficients[3]) * lighting_coefficients[2] : 0.0;\n"
-        //    "  shading += specular;\n"
-           "}\n"
-         );
-   return vertex_shader;
-}
-
-const char *GetFragmentShader()
-{
-   static char fragment_shader[1024];
-   strcpy(fragment_shader, 
-           "#version 400\n"
-           "in float shading;\n"
-           "uniform vec4 color;\n"
-           "out vec4 frag_color;\n"
-           "void main() {\n"
-           "  frag_color = color;\n"
-           "  for(int i = 0; i < 3; i ++){\n"
-           "    frag_color[i] = frag_color[i] * shading > 1 ? 1 : frag_color[i] * shading;\n"
-           "  }\n"
-           "  if(color == vec4(1.0f, 1.0f, 1.0f, 1.0f)){\n"
-           "    frag_color = color;\n"
-           "  }\n"
-           "}\n"
-         );
-   return fragment_shader;
-}
-
 int CreateShaders(){
 
-    const char* vertex_shader = GetVertexShader();
-    const char* fragment_shader = GetFragmentShader();
+    const char* vertex_shader = {
+#include "vshader.glsl"
+    };
+
+    const char* fragment_shader = {
+#include "fshader.glsl"
+    };
 
     int params = -1;
 
