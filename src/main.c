@@ -72,7 +72,7 @@ struct CA_rules {
     int edge_wrap;
 };
 
-#define NUM_RULES 6
+#define NUM_RULES 5
 int current_rule = 0;
 
 struct CA_rules rules[NUM_RULES] = {
@@ -89,9 +89,6 @@ struct CA_rules rules[NUM_RULES] = {
         "Pyroclastic", 1, NULL, 1, NULL, 10, 'M', 0
     },
     {
-        "Builder 2", 1, NULL, 1, NULL, 2, 'M', 0
-    },
-    {
         "Clouds 1", 1, NULL, 2, NULL, 2, 'M', 1
     }
 };
@@ -102,7 +99,6 @@ int survive_bounds[] = {
     10, 11, 13, 26,
     2, 3,
     4, 7,
-    5, 7,
     13, 26
 };
 
@@ -112,7 +108,6 @@ int born_bounds[] = {
     14, 15, 17, 19,
     4, 10,
     6, 8,
-    1, 1,
     13, 14, 17, 19
 };
 
@@ -329,9 +324,9 @@ int main(int argc, char** argv){
 
         if(KeyClicked(SDLK_4)){
             ClearGrid();
-            for(int x = -3; x < 3; x ++){
-                for(int y = -3; y < 3; y ++){
-                    for(int z = -3; z < 3; z ++){
+            for(int x = -4; x < 4; x ++){
+                for(int y = -4; y < 4; y ++){
+                    for(int z = -4; z < 4; z ++){
                         main_grid[X_CELLS / 2 + x][Y_CELLS / 2 + y][Z_CELLS / 2 + z] = rand() % 2;
                     }
                 }
