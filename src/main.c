@@ -18,9 +18,6 @@
 #include "camera.h"
 #include "defines.h"
 #include "input.h"
-#include "ui.h"
-
-
 
 #define MAX_X_CELLS 80
 #define MAX_Y_CELLS 80
@@ -51,11 +48,12 @@ double grid_update_interval = 0.55f;
 
 int update_counter = 1;
 
-int num_color_schemes = 3;
+int num_color_schemes = 4;
 enum COLOR_SCHEME {
     RGB_CUBE = 0,
     STATE_SHADING,
-    GRAY_CUBES
+    GRAY_CUBES,
+    RGB_STATE_CUBE
 };
 
 enum COLOR_SCHEME current_color_scheme = RGB_CUBE;
@@ -79,6 +77,9 @@ int current_rule = 0;
 
 struct CA_rules rules[NUM_RULES] = {
     {
+        "Amoeba-1", 1, NULL, 3, NULL, 16, 'M', 1
+    },
+    {
         "test1", 2, NULL, 2, NULL, 4, 'M', 0
     },
     {
@@ -92,30 +93,27 @@ struct CA_rules rules[NUM_RULES] = {
     },
     {
         "Clouds 1", 1, NULL, 2, NULL, 2, 'M', 1
-    },
-    {
-        "Pulse Waves", 1, NULL, 1, NULL, 10, 'M', 0
     }
 };
 
 int survive_bounds_counter = 0;
 int survive_bounds[] = {
-    1, 6, 18, 18,
+    9, 26,
+    10, 11, 13, 26,
     2, 3,
     4, 7,
     5, 7,
-    13, 26,
-    3, 3
+    13, 26
 };
 
 int born_bounds_counter = 0;
 int born_bounds[] = {
-    10, 11, 14, 15,
+    5, 7, 12, 13, 15, 15,
+    14, 15, 17, 19,
     4, 10,
     6, 8,
     1, 1,
-    13, 14, 17, 19,
-    1, 3
+    13, 14, 17, 19
 };
 
 int INIT();
@@ -324,6 +322,17 @@ int main(int argc, char** argv){
                 for(int y = -4; y < 4; y ++){
                     for(int z = -4; z < 4; z ++){
                         main_grid[X_CELLS / 2 + x][Y_CELLS / 2 + y][Z_CELLS / 2 + z] = 1;
+                    }
+                }
+            }
+        }
+
+        if(KeyClicked(SDLK_4)){
+            ClearGrid();
+            for(int x = -3; x < 3; x ++){
+                for(int y = -3; y < 3; y ++){
+                    for(int z = -3; z < 3; z ++){
+                        main_grid[X_CELLS / 2 + x][Y_CELLS / 2 + y][Z_CELLS / 2 + z] = rand() % 2;
                     }
                 }
             }
@@ -580,6 +589,19 @@ void DRAW(){
                         }
                         case GRAY_CUBES:{
                             UpdateColorUniform(GRAY);
+                            break;
+                        }
+                        case RGB_STATE_CUBE:{
+                            if(main_grid[x][y][z] == 1){
+                                // Assign colors from xyz coordinate (RGB cube)
+                                float r = (x * 3.0f + (150 - X_CELLS)) / 255.0f;
+                                float g = (y * 1.2f + (170 - Y_CELLS)) / 255.0f;
+                                float b = (z * 3.5f + (150 - Z_CELLS)) / 255.0f;
+                                UpdateColorUniform((vec4){r, g, b, 1.0f});
+                            } else {
+                                UpdateColorUniform(RED);
+                            }
+                            
                             break;
                         }
 
