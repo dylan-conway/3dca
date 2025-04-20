@@ -1,3 +1,5 @@
 src/*.o
 src/*.d
 *.exe
+.zig-cache
+zig-out
