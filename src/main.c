@@ -763,7 +763,8 @@ void UpdateCells(){
     char nbh = rules[current_rule].neighborhood;
 
     // Count neighbors.
-    int num_neighbors[X_CELLS][Y_CELLS][Z_CELLS];
+    // Static: at max grid size this is ~2MB, too large for the default Windows stack.
+    static int num_neighbors[MAX_X_CELLS][MAX_Y_CELLS][MAX_Z_CELLS];
     for(int x = 0; x < X_CELLS; x ++){
         for(int y = 0; y < Y_CELLS; y ++){
             for(int z = 0; z < Z_CELLS; z ++){
