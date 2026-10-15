@@ -650,11 +650,11 @@ int CountMooreNeighbors(int x, int y, int z){
                 if(rules[current_rule].edge_wrap){
                     // Clouds 1 looks better when edges wrap
                     if(new_x == -1) new_x = X_CELLS - 1;
-                    if(new_x == X_CELLS) new_x = 0;
+                    if(new_x == X_CELLS) new_x = 1;
                     if(new_y == -1) new_y = Y_CELLS - 1;
-                    if(new_y == Y_CELLS) new_y = 0;
+                    if(new_y == Y_CELLS) new_y = 1;
                     if(new_z == -1) new_z = Z_CELLS - 1;
-                    if(new_z == Z_CELLS) new_z = 0;
+                    if(new_z == Z_CELLS) new_z = 1;
                     if(GetCell(new_x, new_y, new_z) == 1){
                         count ++;
                     }
@@ -686,11 +686,11 @@ int CountMooreNeighbors(int x, int y, int z){
 //                     int new_y = y + j;
 //                     int new_z = z + k;
 //                     if(new_x == -1) new_x = X_CELLS - 1;
-//                     if(new_x == X_CELLS) new_x = 0;
+//                     if(new_x == X_CELLS) new_x = 1;
 //                     if(new_y == -1) new_y = Y_CELLS - 1;
-//                     if(new_y == Y_CELLS) new_y = 0;
+//                     if(new_y == Y_CELLS) new_y = 1;
 //                     if(new_z == -1) new_z = Z_CELLS - 1;
-//                     if(new_z == Z_CELLS) new_z = 0;
+//                     if(new_z == Z_CELLS) new_z = 1;
 //                     if(GetCell(new_x, new_y, new_z) == 1){
 //                         count ++;
 //                     }
